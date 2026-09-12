@@ -147,24 +147,36 @@ async def ws_handler(request):
     await ws.prepare(request)
     e = Espectador(ws)
     est = app['estado']
+    # O estado atual vai DIRETO no socket, nao pela fila do espectador. A fila guarda 6 e descarta o mais
+    # velho quando enche: como o retrato tem ~20 itens, o 'ola' (o primeiro) era jogado fora e a pagina
+    # nunca sabia quantas moscas montar - a cena 3D nao subia. Achado em 12/09, no primeiro deploy.
+    inicio = []
     if est.get('ola'):
-        e.enviar(('t', est['ola']))
+        inicio.append(('t', est['ola']))
     if est.get('ola_ele'):
-        e.enviar(('t', est['ola_ele']))
+        inicio.append(('t', est['ola_ele']))
     if est.get('config'):
-        e.enviar(('t', json.dumps(dict(est['config'], tipo='config'), separators=(',', ':'))))
+        inicio.append(('t', json.dumps(dict(est['config'], tipo='config'), separators=(',', ':'))))
     if est.get('corpo'):
-        e.enviar(('b', est['corpo']))
+        inicio.append(('b', est['corpo']))
     if est.get('quadro'):
-        e.enviar(('b', est['quadro'][1]))
+        inicio.append(('b', est['quadro'][1]))
     if est.get('quadro_ele'):
-        e.enviar(('b', est['quadro_ele'][1]))
+        inicio.append(('b', est['quadro_ele'][1]))
     if est.get('resumo'):
-        e.enviar(('t', est['resumo']))
+        inicio.append(('t', est['resumo']))
     for ev in list(est['ordens'])[-6:]:
-        e.enviar(('t', ev))
+        inicio.append(('t', ev))
     for ev in list(est['eventos'])[-12:]:
-        e.enviar(('t', ev))
+        inicio.append(('t', ev))
+    try:
+        for tipo, dados in inicio:
+            if tipo == 'b':
+                await ws.send_bytes(dados)
+            else:
+                await ws.send_str(dados)
+    except Exception:
+        return ws
     app['espectadores'].add(e)
     escritor = asyncio.create_task(e.escritor())
     try:
