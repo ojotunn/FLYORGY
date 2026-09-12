@@ -269,6 +269,7 @@ function binario(buf) {
     m.el.classList.toggle('foco', i === j.foco);
     desenharCerebro(m, idx, rot, i === j.foco, info.spikes_per_s || 0);
   }
+  Orgia.dn(j.moscas);                 // o cerebro do macho acelera a estocada dele
   $('hSpikes').textContent = fmt(j.spikes_per_s || 0);
   $('hPassos').textContent = Math.round(j.steps_per_s || 0);
   $('pViewers').innerHTML = 'watching <b>' + (j.viewers || 0) + '</b>';

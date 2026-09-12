@@ -287,8 +287,9 @@ def estimular_par(nome, ms, p, quem='ambos'):
 class Libido:
     """Medidor do cruzamento: compra sobe (pelo tamanho relativo ao p90), venda derruba, decai em ~90 s.
     Estados: idle (< 0.06) -> courting (< 0.18) -> mating; venda grande = chute (rejected) por 6 s."""
-    def __init__(self):
-        self.v = 0.0; self.estado = 'idle'; self.chute_ate = 0.0; self.t_pub = 0.0; self.v_pub = -1.0; self.est_pub = ''
+    def __init__(self, piso=0.0):
+        self.v = piso; self.piso = piso        # piso: com 16 pares, o trade de um token dividido por 16 nao
+        self.estado = 'idle'; self.chute_ate = 0.0; self.t_pub = 0.0; self.v_pub = -1.0; self.est_pub = ''
         self.ultimo_t = time.time(); self.prox_canto = 0.0
 
     def compra(self, usd, p90):
@@ -296,14 +297,16 @@ class Libido:
 
     def venda(self, usd, p50, p90):
         if usd >= p90:
-            self.v = max(0.0, self.v - 0.6); self.chute_ate = time.time() + 6.0
+            self.v = max(self.piso, self.v - 0.6); self.chute_ate = time.time() + 6.0
             return 'chute'
-        self.v = max(0.0, self.v - (0.25 if usd >= p50 else 0.10))
+        self.v = max(self.piso, self.v - (0.25 if usd >= p50 else 0.10))
         return 'esfria'
 
     def passo(self):
         agora = time.time(); dt = agora - self.ultimo_t; self.ultimo_t = agora
-        self.v = max(0.0, self.v - dt / 180.0)          # decai em ~3 min: sem compras eles vao devagar, nao param
+        # decai em ~7 min de volta ao PISO daquele par (nao a zero): sem compra o casal continua no
+        # ritmo dele, com compra acelera. Era isto que deixava a sala inteira em libido 0 e 2 Hz.
+        self.v = max(self.piso, self.v - dt / 420.0)
         if agora < self.chute_ate:
             novo = 'rejected'
         elif agora < self.chute_ate + 5.0:               # depois do chute ele volta cantando por 5 s e monta de novo
@@ -328,9 +331,8 @@ class Coro:
     de so esquentar sempre o mesmo casal); uma venda grande chuta o par mais QUENTE."""
     def __init__(self, n):
         self.n = n
-        self.pares = [Libido() for _ in range(n)]
-        for k, lib in enumerate(self.pares):
-            lib.v = 0.05 + 0.03 * k            # comecam quase parados, cada um num ponto
+        # cada par tem um piso proprio (0,22 a 0,52): a sala nunca fica igual nem parada
+        self.pares = [Libido(piso=0.22 + 0.30 * (((k * 2654435761) % 997) / 997.0)) for k in range(n)]
         self.t_pub = 0.0
 
     def compra(self, usd, p90):
@@ -347,7 +349,7 @@ class Coro:
         if usd < p90:                          # venda pequena esfria a sala inteira um pouco
             for k, lib in enumerate(self.pares):
                 if k != i:
-                    lib.v = max(0.0, lib.v - 0.04)
+                    lib.v = max(lib.piso, lib.v - 0.04)
         return i, r
 
     def passo(self):

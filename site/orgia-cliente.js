@@ -1,16 +1,20 @@
 // Cliente do FLY ORGY: N moscas na mesma cena, em pares, desenhadas no navegador.
 //
 // O que muda em relacao ao SEX FLY (2 moscas, um Object3D por peca):
-//   1. INSTANCIACAO. Sao 69 pecas de malha por mosca. Com 16 moscas + reflexo isso daria 2.208
-//      chamadas de desenho por quadro e a placa do visitante morreria. Aqui cada peca vira UM
-//      InstancedMesh com uma matriz por mosca: 69 chamadas, nao importa quantas moscas.
-//   2. ATRASO POR MOSCA. O corpo (corpo/corpo.py) manda UM fluxo de pose, 30x por segundo. Guardo
-//      os ultimos ~4 s num anel e cada mosca le num atraso diferente, entao elas nao ficam clones
+//   1. INSTANCIACAO. Sao 69 pecas de malha por mosca. Com 32 moscas isso daria 2.208 chamadas de
+//      desenho por quadro e a placa do visitante morreria. Aqui cada peca vira UM InstancedMesh com
+//      uma matriz por mosca: 69 chamadas, nao importa quantas moscas.
+//   2. ATRASO POR MOSCA. O corpo (corpo/corpo.py) manda UM fluxo de pose, 30x por segundo. Guardo os
+//      ultimos ~5 s num anel e cada mosca le num atraso diferente, entao elas nao ficam clones
 //      congelados no mesmo passo de perna. E a mesma animacao anatomica, so que defasada.
 //   3. RITMO POR PAR. Cada par tem libido, estado e frequencia proprios, vindos dos DOIS cerebros
 //      dele (o mercado manda). O que voce ve bombando rapido e um par com libido alta de verdade.
 //   4. AUTO-AJUSTE. Se o quadro cair abaixo de 40 fps ele desliga o reflexo; abaixo de 30, baixa a
 //      resolucao. Sem isso um celular fraco viraria slideshow.
+//
+// A MONTADA e a do SEX FLY, portada inteira (12/09): onda de estocada rapida na ida e lenta na volta,
+// o CORPO dele avancando (nao so o abdomen dobrando), o abdomen girando em torno do encaixe no torax,
+// o empurrao nela um quadro depois, e a calibracao que poe a ponta dele na dela sem atravessar.
 window.decodeDV = function (u8) {
   const out = new Uint32Array(u8.length); let n = 0, acc = 0, i = 0;
   while (i < u8.length) { let v = 0, s = 0, b; do { b = u8[i++]; v |= (b & 0x7F) << s; s += 7; } while ((b & 0x80) && i < u8.length); acc += v; out[n++] = acc; }
@@ -22,46 +26,58 @@ window.Orgia = (function () {
   const ANEL = 150;                  // quadros de pose guardados (~5 s a 30 fps)
   const S = {
     pronto: false, ren: null, scene: null, cam: null, canvas: null, box: null,
-    nq: 0, fovy: 45, corpos: [], juntas: [], geoms: [], raiz: -1, asas: {}, abd: [],
-    inst: [], instE: [], locais: [], matriz: [], qtmp: null, qtmp2: null,
+    nq: 0, fovy: 45, corpos: [], juntas: [], geoms: [], raiz: -1, asas: {}, abd: [], abdBase: -1,
+    inst: [], instE: [], locais: [], matriz: [], matrizM: [], matrizC: [], qtmp: null, qEla: null, qEle: null,
     anel: [], anelT: [], anelN: 0, ultimo: 0, erro: null,
-    NF: 16, pares: [], moscas: [], reflexo: true, cal: null, calN: 0,
+    NF: 0, pares: [], moscas: [], reflexo: true, raioMax: 0,
     fps: 60, fpsT: 0, fpsN: 0, degrau: 0, ruim: 0, aquece: 0,
     orbita: { az: 0.7, el: 0.30, dist: 26, alvo: [0, 0, 1.2], vel: 0.10 },
-    aj: { raboBase: 0.45, raboAmp: 0.35, pitch: -0.15, alvo: 1.05 },   // mesma calibracao medida no SEX FLY
+    // a camera PASSEIA: fica em cima de um casal por 13 s (da para ver a bombada) e abre a sala por 7 s.
+    // De longe, com 16 casais, o vaivem e 4% do corpo da mosca e some na tela - foi o que o Michel viu.
+    tour: { perto: false, par: 0, ate: 0 },
+    aj: { raboBase: 0.45, raboAmp: 0.35, pitch: -0.15, alvo: 1.05 },   // calibracao medida no SEX FLY
   };
   const M = new THREE.Matrix4(), M2 = new THREE.Matrix4(), M3 = new THREE.Matrix4();
   const MI = new THREE.Matrix4(), MS = new THREE.Matrix4().makeScale(1, 1, -1);
   const Q = new THREE.Quaternion(), V = new THREE.Vector3(), UM = new THREE.Vector3(1, 1, 1);
-  const RM = new THREE.Matrix4(), RQ = new THREE.Quaternion(), RE = new THREE.Euler();
+  const RM = new THREE.Matrix4(), RO = new THREE.Matrix4(), RQ = new THREE.Quaternion(), RE = new THREE.Euler();
+  const HER = new THREE.Matrix4(), SLOT = new THREE.Matrix4(), TL = new THREE.Matrix4(), RP = new THREE.Matrix4();
+  const PV = new THREE.Vector3(), EX = new THREE.Vector3(), RB = new THREE.Matrix4(), T1 = new THREE.Matrix4(), T2 = new THREE.Matrix4();
+  const PA = new THREE.Vector3(), PB = new THREE.Vector3(), PC = new THREE.Vector3(), PD = new THREE.Vector3();
+  const MENOR = new THREE.Vector3(0.9, 0.9, 0.9);   // ele e um pouco menor que ela, como no SEX FLY
 
   function TR(pos, quat, out) { return out.compose(V.set(pos[0], pos[1], pos[2]), Q.set(quat[1], quat[2], quat[3], quat[0]), UM); }
 
+  const POSES = {   // deslocamento dele em relacao a ela [x para tras, y para o lado, z para cima]
+    idle: { p: [-2.6, 1.3, 0.0], yaw: 0.45, pitch: 0.0 },
+    courting: { p: [-2.1, 0.9, 0.0], yaw: 0.25, pitch: 0.0 },
+    mating: { p: [-0.60, 0.0, 0.90], yaw: 0.0, pitch: -0.10 },
+    rejected: { p: [-3.4, -1.4, 0.0], yaw: -0.6, pitch: 0.0 },
+  };
+
   // ---------- arranjo do enxame: pares em aneis, virados para dentro ----------
   function arranjar(nf) {
-    const np = Math.floor(nf / 2); S.pares = []; S.moscas = [];
+    const np = Math.floor(nf / 2); S.pares = []; S.moscas = []; S.raioMax = 0;
+    const CAPS = [3, 5, 8, 12], RAIOS = [3.4, 7.6, 11.4, 15.6], GIROS = [0.0, 0.55, 1.1, 1.7];
     for (let p = 0; p < np; p++) {
-      // aneis de 3, 5, 8 e 12 pares; o que sobrar vai para o de fora
-      const CAPS = [3, 5, 8, 12], RAIOS = [3.4, 7.6, 11.4, 15.6], GIROS = [0.0, 0.55, 1.1, 1.7];
       let anel = 0, ini = 0;
       while (anel < 3 && p >= ini + CAPS[anel]) { ini += CAPS[anel]; anel++; }
       const naAnel = Math.min(CAPS[anel], np - ini);
-      const iAnel = p - ini;
+      const a = ((p - ini) / Math.max(1, naAnel)) * Math.PI * 2 + GIROS[anel];
       const r = RAIOS[anel];
-      S.raioMax = Math.max(S.raioMax || 0, r);
-      const a = (iAnel / Math.max(1, naAnel)) * Math.PI * 2 + GIROS[anel];
-      const x = Math.cos(a) * r, y = Math.sin(a) * r;
-      const yaw = a + Math.PI * 0.5 + (((p * 2654435761) % 1000) / 1000 - 0.5) * 0.9;   // meio de lado, sem sorteio a cada carga
+      S.raioMax = Math.max(S.raioMax, r);
       S.pares.push({
-        p, x, y, yaw, atraso: (p * 137) % 3600,        // ms de atraso no anel de poses
+        p, x: Math.cos(a) * r, y: Math.sin(a) * r,
+        yaw: a + Math.PI * 0.5 + (((p * 2654435761) % 1000) / 1000 - 0.5) * 0.9,
+        atraso: (p * 137) % 3600,                       // ms de atraso no anel de poses
         libido: 0, estado: 'idle', ritmo: 1.2, t0: performance.now(), t_est: performance.now(),
-        empurrao: 0, fase: (p * 0.61803) % 1,
+        pose: null, empurrao: 0, rabo: 0, cal: [0, 0, 0], calN: 0, dnEle: 0,
       });
       S.moscas.push({ par: p, papel: 'f' }, { par: p, papel: 'm' });
     }
     S.NF = S.moscas.length;
-    S.orbita.dist = 15 + (S.raioMax || 3.4) * 1.55;      // enquadra o anel de fora
-    S.reflexo = S.NF <= 16;                              // acima disso o reflexo dobra o triangulo a toa
+    S.orbita.dist = 15 + (S.raioMax || 3.4) * 1.55;
+    S.reflexo = S.NF <= 16;
   }
 
   async function init(canvas, nf) {
@@ -96,8 +112,9 @@ window.Orgia = (function () {
         const aplicar = (t) => { for (const mm of [mats[k], matsE[k]]) { mm.map = t; mm.color.copy(mm === mats[k] ? cor : cor.clone().multiplyScalar(0.5)); mm.needsUpdate = true; } };
         if (texs[m.tex]) { const t = texs[m.tex]; if (t.image) aplicar(t); else t.__esperando.push(aplicar); }
         else {
-          const loader = new THREE.TextureLoader();
-          const t = loader.load('/static/fly-tex/' + m.tex + '.png', (tx) => { (tx.__esperando || []).forEach(f => f(tx)); tx.__esperando = []; }, undefined, () => console.warn('textura nao carregou:', m.tex));
+          const t = new THREE.TextureLoader().load('/static/fly-tex/' + m.tex + '.png',
+            (tx) => { (tx.__esperando || []).forEach(f => f(tx)); tx.__esperando = []; }, undefined,
+            () => console.warn('textura nao carregou:', m.tex));
           t.flipY = false; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; t.__esperando = [aplicar]; texs[m.tex] = t;
         }
       }
@@ -113,10 +130,12 @@ window.Orgia = (function () {
     S.corpos = j.corpos; S.geoms = j.geoms;
     S.juntas = j.corpos.map(() => []); j.juntas.forEach(jt => S.juntas[jt.corpo].push(jt));
     S.matriz = j.corpos.map(() => new THREE.Matrix4());
+    S.matrizM = j.corpos.map(() => new THREE.Matrix4());
+    S.matrizC = j.corpos.map(() => new THREE.Matrix4());
     j.juntas.forEach(jt => { if (jt.tipo === 0) S.raiz = jt.qadr; if (jt.nome) S.asas[jt.nome] = jt.qadr; });
     S.abd = j.corpos.map((c, i) => [c.nome, i]).filter(x => ['A1A2', 'A3', 'A4', 'A5', 'A6'].includes(x[0])).map(x => x[1]);
+    S.abdBase = S.abd.length ? S.abd[0] : -1;
 
-    // uma malha instanciada por peca: 69 chamadas de desenho para o enxame inteiro
     for (const g of j.geoms) {
       const local = new THREE.Matrix4(); TR(g.pos, g.quat, local); S.locais.push(local);
       const im = new THREE.InstancedMesh(geos[g.malha], mats[g.mat], S.NF);
@@ -129,7 +148,7 @@ window.Orgia = (function () {
     const chao = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.82, depthWrite: false }));
     chao.renderOrder = 1; S.scene.add(chao);
 
-    S.qtmp = new Float32Array(S.nq); S.qtmp2 = new Float32Array(S.nq);
+    S.qtmp = new Float32Array(S.nq); S.qEla = new Float32Array(S.nq); S.qEle = new Float32Array(S.nq);
     for (let i = 0; i < ANEL; i++) { S.anel.push(null); S.anelT.push(0); }
     redimensionar(); new ResizeObserver(redimensionar).observe(S.box);
   }
@@ -137,31 +156,42 @@ window.Orgia = (function () {
   function redimensionar() {
     if (!S.ren) return;
     const r = S.box.getBoundingClientRect(); const w = Math.max(2, r.width), h = Math.max(2, r.height);
-    const teto = S.degrau >= 2 ? 1.0 : 1.5;
-    S.ren.setPixelRatio(Math.min(teto, window.devicePixelRatio || 1)); S.ren.setSize(w, h, false);
+    S.ren.setPixelRatio(Math.min(S.degrau >= 2 ? 1.0 : 1.5, window.devicePixelRatio || 1));
+    S.ren.setSize(w, h, false);
     S.cam.aspect = w / h; S.cam.updateProjectionMatrix();
   }
 
   // ---------- entrada ----------
-  function quadro(j, bytes) {           // pose vinda de corpo/corpo.py
+  function quadro(j, bytes) {
     const q = new Float32Array(bytes);
     if (!S.pronto || q.length !== S.nq) return;
     const i = S.anelN % ANEL;
     S.anel[i] = q; S.anelT[i] = performance.now(); S.anelN++; S.ultimo = S.anelT[i];
   }
 
-  function sexo(m) {                     // estado dos pares, vindo do mercado (um por par)
+  function sexo(m) {
     if (!m || !Array.isArray(m.pares)) return;
     for (const d of m.pares) {
-      const p = S.pares[d.i]; if (!p) continue;
-      if (d.estado && d.estado !== p.estado) { p.estado = d.estado; p.t_est = performance.now(); }
-      if (d.libido != null) p.libido = d.libido;
-      if (d.ritmo != null) p.ritmo = d.ritmo;
-      if (d.empurrao != null) p.empurrao = d.empurrao;
+      const par = S.pares[d.i]; if (!par) continue;
+      if (d.estado && d.estado !== par.estado) { par.estado = d.estado; par.t_est = performance.now(); par.calN = 0; }
+      if (typeof d.libido === 'number') par.libido = d.libido;
+      if (d.ritmo && d.ritmo !== par.ritmo) {     // troca o ritmo sem pular a fase da estocada
+        const ag = performance.now();
+        const ph = ((((ag - par.t0) / 1000) * par.ritmo) % 1 + 1) % 1;
+        par.ritmo = d.ritmo; par.t0 = ag - ph / par.ritmo * 1000;
+      }
     }
   }
 
-  // ---------- pose atrasada: le o anel em (agora - atraso) e interpola ----------
+  function dn(lista) {   // taxa dos neuronios de andar do MACHO de cada par: acelera a estocada dele
+    if (!Array.isArray(lista)) return;
+    for (let p = 0; p < S.pares.length; p++) {
+      const m = lista[p * 2 + 1];
+      if (m && m.dn) S.pares[p].dnEle = m.dn.forward || 0;
+    }
+  }
+
+  // ---------- pose atrasada ----------
   function poseEm(alvoMs, saida) {
     let a = -1, b = -1;
     for (let k = 0; k < ANEL; k++) {
@@ -170,7 +200,7 @@ window.Orgia = (function () {
       if (S.anelT[i] <= alvoMs) { a = i; break; }
       b = i;
     }
-    if (a < 0) { const u = (S.anelN - 1 + ANEL * 4) % ANEL; return S.anel[u]; }
+    if (a < 0) return S.anel[(S.anelN - 1 + ANEL * 4) % ANEL];
     if (b < 0) return S.anel[a];
     const t0 = S.anelT[a], t1 = S.anelT[b];
     const al = t1 > t0 ? Math.max(0, Math.min(1, (alvoMs - t0) / (t1 - t0))) : 0;
@@ -179,9 +209,8 @@ window.Orgia = (function () {
     return saida;
   }
 
-  // ---------- cinematica direta, escrevendo direto nas instancias ----------
-  function aplicarInstancia(q, raizM, f, espelho) {
-    const mat = S.matriz;
+  // ---------- cinematica direta em cima de uma raiz dada ----------
+  function calcular(q, raizM, mat) {
     for (let b = 0; b < S.corpos.length; b++) {
       const c = S.corpos[b], jl = S.juntas[b], W = mat[b];
       if (jl.length && jl[0].tipo === 0) { W.copy(raizM); }
@@ -196,6 +225,9 @@ window.Orgia = (function () {
         if (c.pai >= 0) W.premultiply(mat[c.pai]);
       }
     }
+  }
+
+  function escrever(mat, f, espelho) {
     for (let g = 0; g < S.geoms.length; g++) {
       MI.multiplyMatrices(mat[S.geoms[g].corpo], S.locais[g]);
       S.inst[g].setMatrixAt(f, MI);
@@ -203,26 +235,38 @@ window.Orgia = (function () {
     }
   }
 
-  function balancarRabo(ang) {          // curva o abdomen dele para baixo (a bombada)
-    for (let k = 1; k < S.abd.length; k++) {
-      const b = S.abd[k];
-      RE.set(0, ang / (S.abd.length - 1), 0); RQ.setFromEuler(RE);
-      M.makeRotationFromQuaternion(RQ); S.matriz[b].multiply(M);
-    }
+  // gira o abdomen INTEIRO dele em torno do encaixe no torax, em volta do eixo lateral do corpo dele
+  function balancarRabo(ang, raiz, mat) {
+    if (S.abdBase < 0) return;
+    PV.setFromMatrixPosition(mat[S.abdBase]);
+    EX.set(raiz.elements[4], raiz.elements[5], raiz.elements[6]).normalize();
+    RB.makeRotationAxis(EX, -ang);
+    T1.makeTranslation(PV.x, PV.y, PV.z); T2.makeTranslation(-PV.x, -PV.y, -PV.z);
+    for (const b of S.abd) mat[b].premultiply(T2).premultiply(RB).premultiply(T1);
   }
 
-  // ---------- camada sexual: o macho montado, a partir da pose dela ----------
-  const POSES = {
-    idle: { p: [-2.2, 1.5, 0.0], yaw: 0.5, pitch: 0 },
-    courting: { p: [-1.55, 0.30, 0.0], yaw: 0.18, pitch: 0 },
-    rejected: { p: [-2.9, 1.9, 0.0], yaw: 1.0, pitch: 0 },
-    mating: { p: [-0.60, 0.0, 0.90], yaw: 0, pitch: -0.10 },
-  };
+  // raiz dela: o lugar do par na sala x a raiz que veio do corpo (altura e inclinacao dela sao reais)
+  function raizDela(q, par, empurrao) {
+    const a = S.raiz;
+    RE.set(0, 0, par.yaw); RQ.setFromEuler(RE);
+    SLOT.compose(V.set(par.x, par.y, 0), RQ, UM);
+    HER.compose(V.set(0, 0, q[a + 2]), Q.set(q[a + 4], q[a + 5], q[a + 6], q[a + 3]).normalize(), UM);
+    HER.premultiply(SLOT);
+    if (empurrao) { TL.makeTranslation(empurrao, 0, 0); HER.multiply(TL); }   // ela e empurrada para a frente
+    return HER;
+  }
 
-  function poseMacho(q, par, tt, saida) {
+  // raiz dele = raiz dela x deslocamento, no referencial dela (x para a frente, z para cima)
+  function raizDele(raizF, alvo, px, py, pz, roll, pitch, yaw) {
+    alvo.copy(raizF);
+    RO.compose(V.set(px, py, pz), RQ.setFromEuler(RE.set(roll, pitch, yaw, 'ZYX')), MENOR);
+    return alvo.multiply(RO);
+  }
+
+  // pose dele nas juntas (asas, cabeca, tromba, pernas) conforme o estado
+  function juntasDele(q, par, tt, f, saida) {
     saida.set(q);
-    const est = par.estado, lib = par.libido, ritmo = par.ritmo;
-    const f = Math.sin(tt * 2 * Math.PI * ritmo + par.fase * 6.283);
+    const est = par.estado, lib = par.libido, ritmo = ritmoDe(par);
     if (est === 'mating') {
       const ab = 0.22 + 0.12 * lib + 0.06 * Math.sin(tt * 2 * Math.PI * ritmo * 2);
       if (S.asas.joint_LWing_abre != null) {
@@ -231,7 +275,7 @@ window.Orgia = (function () {
         saida[S.asas.joint_RWing_bate] += 0.05 * Math.sin(tt * 2 * Math.PI * ritmo * 4);
       }
       if (S.asas.joint_Head != null) saida[S.asas.joint_Head] += 0.15 + 0.1 * Math.max(0, f);
-      if (S.asas.joint_Proboscis != null) saida[S.asas.joint_Proboscis] += 0.5 * Math.max(0, Math.sin(tt * Math.PI * ritmo));
+      if (S.asas.joint_Proboscis != null) saida[S.asas.joint_Proboscis] += 0.5 * Math.max(0, Math.sin(tt * 2 * Math.PI * ritmo * 0.5));
       for (const perna of ['LF', 'LM', 'LH', 'RF', 'RM', 'RH']) {
         const fe = S.asas['joint_' + perna + 'Femur'], ti = S.asas['joint_' + perna + 'Tibia'], cx = S.asas['joint_' + perna + 'Coxa'];
         const tipo = perna[1];
@@ -244,13 +288,17 @@ window.Orgia = (function () {
       if (S.asas.joint_LWing_abre != null) { saida[S.asas.joint_LWing_abre] += 1.15 + vib; saida[S.asas.joint_LWing_bate] += vib * 0.5; }
     } else if (est === 'rejected') {
       if (S.asas.joint_LWing_abre != null) { saida[S.asas.joint_LWing_abre] += 0.9; saida[S.asas.joint_RWing_abre] += 0.9; }
+    } else if (S.asas.joint_Head != null) {
+      saida[S.asas.joint_Head] += 0.08 * Math.sin(tt * 2 * Math.PI * 0.5);
     }
-    return f;
+    return saida;
   }
 
-  function raizDoPar(par, dz) {
-    RE.set(0, 0, par.yaw); RQ.setFromEuler(RE);
-    return RM.compose(V.set(par.x, par.y, dz || 0), RQ, UM);
+  const ritmoDe = par => par.ritmo * (1 + 0.25 * Math.min(1, (par.dnEle || 0) / 120));
+  // onda da estocada: 30% do ciclo indo (rapido) e 70% voltando (lento). f=1 e o pico.
+  function ondaEstocada(tt, ritmo) {
+    const ph = ((tt * ritmo) % 1 + 1) % 1;
+    return ph < 0.3 ? Math.sin(ph / 0.3 * Math.PI / 2) : Math.cos((ph - 0.3) / 0.7 * Math.PI / 2);
   }
 
   // ---------- laco ----------
@@ -258,103 +306,141 @@ window.Orgia = (function () {
     requestAnimationFrame(loop);
     if (!S.pronto || S.anelN === 0) return;
     const agora = performance.now();
-    if (agora - S.ultimo > 8000) return;                 // corpo parado: nao gasta a placa do visitante
+    if (agora - S.ultimo > 8000) return;
     medirFps(agora);
+    const k = 1 - Math.pow(0.001, 1 / 60);
 
     for (let p = 0; p < S.pares.length; p++) {
       const par = S.pares[p];
-      const qEla = poseEm(agora - ATRASO_MS - par.atraso, S.qtmp);
-      if (!qEla) continue;
+      const q = poseEm(agora - ATRASO_MS - par.atraso, S.qtmp);
+      if (!q) continue;
       const tt = (agora - par.t0) / 1000;
+      const est = par.estado, lib = par.libido, ritmo = ritmoDe(par);
       const u = Math.min(1, (agora - par.t_est) / 700);
 
-      // ela: raiz no lugar do par, asas quase fechadas quando montada (senao ele atravessa)
-      if (par.estado === 'mating' && S.asas.joint_LWing_abre != null) {
-        const ab = 0.04 + 0.03 * Math.sin(tt * 2 * Math.PI * par.ritmo);
+      // alvo do deslocamento dele, alcancado suavemente (trocar de estado nao teleporta)
+      const alvo = POSES[est] || POSES.idle;
+      const pitchAlvo = est === 'mating' ? S.aj.pitch : alvo.pitch;
+      if (!par.pose) par.pose = { p: alvo.p.slice(), yaw: alvo.yaw, pitch: pitchAlvo };
+      for (let i = 0; i < 3; i++) par.pose.p[i] += (alvo.p[i] - par.pose.p[i]) * k * 1.4;
+      par.pose.yaw += (alvo.yaw - par.pose.yaw) * k * 1.4;
+      par.pose.pitch += (pitchAlvo - par.pose.pitch) * k * 1.4;
+
+      let px = par.pose.p[0], py = par.pose.p[1], pz = par.pose.p[2];
+      let yaw = par.pose.yaw, pitch = par.pose.pitch, roll = 0, f = 0;
+
+      // ---- ela ----
+      const qEla = S.qEla;
+      qEla.set(q);
+      if (est === 'mating' && S.asas.joint_LWing_abre != null) {
+        const ab = 0.04 + 0.03 * Math.sin(tt * 2 * Math.PI * ritmo);   // asas quase fechadas: ele nao atravessa
         qEla[S.asas.joint_LWing_abre] += ab; qEla[S.asas.joint_RWing_abre] += ab;
       }
-      const raizF = raizDoPar(par, 0).clone();
-      aplicarInstancia(qEla, raizF, p * 2, S.reflexo);
+      const raizF = raizDela(qEla, par, est === 'mating' ? par.empurrao : 0);
+      calcular(qEla, raizF, S.matriz);
+      escrever(S.matriz, p * 2, S.reflexo);
 
-      // ele: mesma malha, pose propria, montado nela
-      const f = poseMacho(qEla, par, tt, S.qtmp2);
-      const alvo = POSES[par.estado] || POSES.idle;
-      let px = alvo.p[0], py = alvo.p[1], pz = alvo.p[2];
-      const pitch = par.estado === 'mating' ? S.aj.pitch : alvo.pitch;
-      if (par.estado === 'mating' && S.cal) { px += S.cal[0] * u; py += S.cal[1] * u; pz += S.cal[2] * u; }
-      if (par.estado === 'idle') py += 0.05 * Math.sin(tt * 2 * Math.PI * 0.3);
-      RE.set(0, pitch, par.yaw + alvo.yaw); RQ.setFromEuler(RE);
-      const cy = Math.cos(par.yaw), sy = Math.sin(par.yaw);
-      RM.compose(V.set(par.x + px * cy - py * sy, par.y + px * sy + py * cy, pz), RQ, UM);
-      aplicarInstancia(S.qtmp2, RM, p * 2 + 1, S.reflexo);
-      if (par.estado === 'mating') {          // a bombada: curva o abdomen dele e reescreve as pecas
-        const ang = S.aj.raboBase + S.aj.raboAmp * (0.5 + 0.5 * f) + 0.2 * par.libido;
-        balancarRabo(ang);
-        for (let g = 0; g < S.geoms.length; g++) {
-          MI.multiplyMatrices(S.matriz[S.geoms[g].corpo], S.locais[g]);
-          S.inst[g].setMatrixAt(p * 2 + 1, MI);
-          if (S.reflexo) { M2.multiplyMatrices(MS, MI); S.instE[g].setMatrixAt(p * 2 + 1, M2); }
+      // ---- ele ----
+      if (est === 'mating') {
+        f = ondaEstocada(tt, ritmo);
+        const amp = 0.10 * (0.4 + 0.6 * lib);
+        px += amp * f; pz += 0.03 * f; pitch += -0.06 * f;      // O CORPO DELE AVANCA: era isto que faltava
+        roll = 0.03 * Math.sin(tt * 2 * Math.PI * ritmo * 0.5);
+        par.empurrao = amp * f * 0.5;                            // ela sente no quadro seguinte
+        par.rabo = S.aj.raboBase + (S.aj.raboAmp + 0.2 * lib) * f;
+        calibrarEncaixe(q, par, lib, raizF);
+        px += par.cal[0] * u; py += par.cal[1] * u; pz += par.cal[2] * u;
+      } else {
+        par.empurrao = 0; par.rabo = 0;
+        if (est === 'courting') {
+          px += 0.15 * Math.sin(tt * 2 * Math.PI * 0.6); py += 0.25 * Math.sin(tt * 2 * Math.PI * 0.35);
+          yaw += 0.15 * Math.sin(tt * 2 * Math.PI * 0.4);
+        } else if (est === 'rejected') {
+          const w = Math.min(1, u * 1.6);
+          pz += 1.8 * Math.sin(Math.PI * w); roll = 2 * Math.PI * w * 1.5; pitch += Math.PI * w * 0.3;
+        } else {
+          py += 0.05 * Math.sin(tt * 2 * Math.PI * 0.3);
         }
       }
+      const qEle = juntasDele(q, par, tt, f, S.qEle);
+      const raizM = raizDele(raizF, RM, px, py, pz, roll, pitch, yaw);
+      calcular(qEle, raizM, S.matrizM);
+      if (est === 'mating') balancarRabo(par.rabo, raizM, S.matrizM);
+      escrever(S.matrizM, p * 2 + 1, S.reflexo);
     }
+
     for (let g = 0; g < S.geoms.length; g++) {
       S.inst[g].instanceMatrix.needsUpdate = true;
       S.instE[g].visible = S.reflexo;
       if (S.reflexo) S.instE[g].instanceMatrix.needsUpdate = true;
     }
 
-    const o = S.orbita; o.az += o.vel * (1 / 60);
-    const a = o.alvo;
+    passear(agora, k);
+    const o = S.orbita, a = o.alvo;
     S.cam.position.set(a[0] + o.dist * Math.cos(o.el) * Math.cos(o.az), a[1] + o.dist * Math.cos(o.el) * Math.sin(o.az), a[2] + o.dist * Math.sin(o.el));
     S.cam.lookAt(a[0], a[1], a[2]);
     S.ren.render(S.scene, S.cam);
   }
 
-  // desliga enfeite sozinho se a placa do visitante nao aguentar
+  // Encaixe: no PICO da estocada (f=1) a ponta do abdomen dele encosta na dela, sem atravessar.
+  // Mede num passo extra (pose no pico) e guarda o ajuste no referencial dela. A cada 20 quadros, por par.
+  function calibrarEncaixe(q, par, lib, raizF) {
+    if (S.abd.length < 5) return;
+    par.calN = (par.calN || 0) + 1;
+    if (par.calN % 20 !== 1) return;
+    const ampP = 0.10 * (0.4 + 0.6 * lib);
+    const raizP = raizDele(raizF, RP, par.pose.p[0] + ampP + par.cal[0], par.pose.p[1] + par.cal[1],
+                           par.pose.p[2] + 0.03 + par.cal[2], 0, par.pose.pitch - 0.06, par.pose.yaw);
+    const qP = juntasDele(q, par, 0.3 / Math.max(0.1, par.ritmo), 1, S.qEle);
+    calcular(qP, raizP, S.matrizC);
+    balancarRabo(S.aj.raboBase + S.aj.raboAmp + 0.2 * lib, raizP, S.matrizC);
+    const a5 = S.abd[3], a6 = S.abd[4];
+    PA.setFromMatrixPosition(S.matrizC[a6]); PB.setFromMatrixPosition(S.matrizC[a5]);
+    PB.sub(PA); PA.addScaledVector(PB, -1.0);                       // ponta dele = A6 + (A6-A5)
+    PC.setFromMatrixPosition(S.matriz[a6]); PD.setFromMatrixPosition(S.matriz[a5]);
+    PD.sub(PC); PC.addScaledVector(PD, -S.aj.alvo);                 // alvo: quase a ponta dela
+    PC.sub(PA);
+    Q.setFromRotationMatrix(raizF).invert(); PC.applyQuaternion(Q); // no referencial dela
+    par.cal[0] += PC.x; par.cal[1] += PC.y * 0.5; par.cal[2] += PC.z;
+  }
+
+  // passeio da camera: perto de um casal, depois a sala inteira, e vai trocando de casal
+  function passear(agora, k) {
+    const o = S.orbita, C = S.tour;
+    if (agora >= C.ate) {
+      C.perto = !C.perto;
+      if (C.perto && S.pares.length) C.par = (C.par + 3) % S.pares.length;   // pula 3 para nao ficar so no anel de dentro
+      C.ate = agora + (C.perto ? 13000 : 7000);
+    }
+    const par = S.pares[C.par] || { x: 0, y: 0 };
+    const aX = C.perto ? par.x : 0, aY = C.perto ? par.y : 0, aZ = C.perto ? 1.45 : 1.2;
+    const dist = C.perto ? 5.4 : 15 + (S.raioMax || 3.4) * 1.55;
+    const el = C.perto ? 0.14 : 0.30;
+    const kk = k * 1.1;
+    o.alvo[0] += (aX - o.alvo[0]) * kk; o.alvo[1] += (aY - o.alvo[1]) * kk; o.alvo[2] += (aZ - o.alvo[2]) * kk;
+    o.dist += (dist - o.dist) * kk;
+    o.el += (el - o.el) * kk;
+    o.az += o.vel * (1 / 60) * (C.perto ? 1.7 : 1.0);
+  }
+
   function medirFps(agora) {
     S.fpsN++;
-    if (!S.fpsT) { S.fpsT = agora; S.aquece = agora + 6000; return; }   // 6 s de aquecimento: textura, compilacao de shader
+    if (!S.fpsT) { S.fpsT = agora; S.aquece = agora + 6000; return; }
     if (agora - S.fpsT < 2000) return;
     S.fps = S.fpsN / ((agora - S.fpsT) / 1000); S.fpsN = 0; S.fpsT = agora;
     if (agora < S.aquece) return;
-    S.ruim = S.fps < 40 ? S.ruim + 1 : 0;                               // duas janelas ruins seguidas, nao uma
+    S.ruim = S.fps < 40 ? S.ruim + 1 : 0;
     if (S.ruim < 2) return;
     if (S.degrau === 0) { S.degrau = 1; S.reflexo = false; S.ruim = 0; console.warn('orgia: reflexo off,', S.fps.toFixed(0), 'fps'); }
     else if (S.degrau === 1 && S.fps < 30) { S.degrau = 2; S.ruim = 0; redimensionar(); console.warn('orgia: resolucao menor,', S.fps.toFixed(0), 'fps'); }
   }
 
-  // calibracao do encaixe (ponta do abdomen dele na dela): uma vez a cada 60 quadros, sobre a pose
-  // base - o modelo e o mesmo para todas, entao a correcao serve para o enxame inteiro
-  function calibrar() {
-    if (!S.pronto || S.anelN === 0 || S.pares.length === 0) return;
-    const par = S.pares[0], q = poseEm(performance.now() - ATRASO_MS, S.qtmp);
-    if (!q) return;
-    const raizF = raizDoPar(par, 0).clone();
-    aplicarInstancia(q, raizF, 0, false);
-    const i5 = S.abd[S.abd.length - 2], i6 = S.abd[S.abd.length - 1];
-    const a5 = new THREE.Vector3().setFromMatrixPosition(S.matriz[i5]);
-    const a6 = new THREE.Vector3().setFromMatrixPosition(S.matriz[i6]);
-    const pontaEla = a6.clone().add(a6.clone().sub(a5)).sub(new THREE.Vector3(par.x, par.y, 0));
-    const pico = Object.assign({}, par, { estado: 'mating', libido: 1 });
-    poseMacho(q, pico, 0.25 / Math.max(0.1, par.ritmo), S.qtmp2);
-    const alvo = POSES.mating;
-    RE.set(0, S.aj.pitch, par.yaw); RQ.setFromEuler(RE);
-    const cy = Math.cos(par.yaw), sy = Math.sin(par.yaw);
-    RM.compose(V.set(par.x + alvo.p[0] * cy, par.y + alvo.p[0] * sy, alvo.p[2]), RQ, UM);
-    aplicarInstancia(S.qtmp2, RM, 1, false);
-    balancarRabo(S.aj.raboBase + S.aj.raboAmp + 0.2);
-    const b5 = new THREE.Vector3().setFromMatrixPosition(S.matriz[i5]);
-    const b6 = new THREE.Vector3().setFromMatrixPosition(S.matriz[i6]);
-    const pontaEle = b6.clone().add(b6.clone().sub(b5)).sub(new THREE.Vector3(par.x, par.y, 0));
-    const d = pontaEla.clone().multiplyScalar(S.aj.alvo).sub(pontaEle);
-    const dx = d.x * cy + d.y * sy, dy = -d.x * sy + d.y * cy;    // volta ao referencial dela
-    S.cal = [dx, dy, d.z];
-  }
-  setInterval(calibrar, 2000);
-
   return {
-    init, quadro, sexo, calibrar,
-    estado: () => ({ fps: S.fps, moscas: S.NF, pares: S.pares.length, reflexo: S.reflexo, erro: S.erro }),
+    init, quadro, sexo, dn,
+    estado: () => ({ fps: S.fps, moscas: S.NF, pares: S.pares.length, reflexo: S.reflexo, erro: S.erro,
+                     estados: S.pares.map(x => x.estado), cal: S.pares[0] && S.pares[0].cal }),
     camera: (o) => Object.assign(S.orbita, o || {}),
+    olhar: (p) => { S.tour.par = p % Math.max(1, S.pares.length); S.tour.perto = true; S.tour.ate = performance.now() + 13000; },
+    interno: S,
   };
 })();
