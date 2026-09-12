@@ -20,6 +20,7 @@ export FLY_CORPO_PISO=preto FLY_CORPO_CORES=real FLY_CORPO_SAIDA=pose
 export FLY_CEREBRO_AFINIDADE=0 FLY_CORPO_AFINIDADE=0
 export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl
 export FLY_MERCADO_MODO="${FLY_MERCADO_MODO:-papel}"
+export FLY_MERCADO_ORDENS="${FLY_MERCADO_ORDENS:-off}"   # o FLY ORGY nao opera: o mercado so vira estimulo
 export PYTHONUNBUFFERED=1
 
 # reinicia sozinho se cair (o mesmo padrao do FLY PAD)
