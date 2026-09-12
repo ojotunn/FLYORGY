@@ -29,7 +29,7 @@ window.Orgia = (function () {
     nq: 0, fovy: 45, corpos: [], juntas: [], geoms: [], raiz: -1, asas: {}, abd: [], abdBase: -1,
     inst: [], instE: [], locais: [], matriz: [], matrizM: [], matrizC: [], qtmp: null, qEla: null, qEle: null,
     anel: [], anelT: [], anelN: 0, ultimo: 0, erro: null,
-    NF: 0, pares: [], moscas: [], reflexo: true, raioMax: 0,
+    NF: 0, pares: [], moscas: [], reflexo: true, raioMax: 0, clube: null, distLarga: 18,
     fps: 60, fpsT: 0, fpsN: 0, degrau: 0, ruim: 0, aquece: 0,
     orbita: { az: 0.7, el: 0.30, dist: 26, alvo: [0, 0, 1.2], vel: 0.10 },
     // a camera PASSEIA: fica em cima de um casal por 13 s (da para ver a bombada) e abre a sala por 7 s.
@@ -66,8 +66,12 @@ window.Orgia = (function () {
       const a = ((p - ini) / Math.max(1, naAnel)) * Math.PI * 2 + GIROS[anel];
       const r = RAIOS[anel];
       S.raioMax = Math.max(S.raioMax, r);
+      // onde o casal fica no clube: anel de dentro no palco, alguns do anel de fora em pedestal,
+      // o resto no chao. O clube.js constroi o movel debaixo de cada um.
+      const palco = anel === 0 ? 2 : (anel >= 2 && (p % 2 === 0) ? 1 : 0);
+      const z = palco === 2 ? 1.55 : (palco === 1 ? 1.10 : 0);
       S.pares.push({
-        p, x: Math.cos(a) * r, y: Math.sin(a) * r,
+        p, x: Math.cos(a) * r, y: Math.sin(a) * r, z, palco,
         yaw: a + Math.PI * 0.5 + (((p * 2654435761) % 1000) / 1000 - 0.5) * 0.9,
         atraso: (p * 137) % 3600,                       // ms de atraso no anel de poses
         libido: 0, estado: 'idle', ritmo: 1.2, t0: performance.now(), t_est: performance.now(),
@@ -76,7 +80,8 @@ window.Orgia = (function () {
       S.moscas.push({ par: p, papel: 'f' }, { par: p, papel: 'm' });
     }
     S.NF = S.moscas.length;
-    S.orbita.dist = 15 + (S.raioMax || 3.4) * 1.55;
+    S.distLarga = Math.min(((S.raioMax || 3.4) + 7.5) * 0.82, 12 + (S.raioMax || 3.4) * 1.2);  // por dentro da parede
+    S.orbita.dist = S.distLarga;
     S.reflexo = S.NF <= 16;
   }
 
@@ -96,11 +101,17 @@ window.Orgia = (function () {
     S.nq = j.nq; S.fovy = (j.cam && j.cam.fovy) || 45;
     S.ren = new THREE.WebGLRenderer({ canvas: S.canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
     S.ren.setClearColor(0x000000, 1); S.ren.outputColorSpace = THREE.SRGBColorSpace;
+    S.ren.toneMapping = THREE.ACESFilmicToneMapping; S.ren.toneMappingExposure = 1.25;
     S.scene = new THREE.Scene(); S.scene.background = new THREE.Color(0x000000);
     S.cam = new THREE.PerspectiveCamera(S.fovy, 2, 0.3, 900); S.cam.up.set(0, 0, 1);
-    S.scene.add(new THREE.HemisphereLight(0xffffff, 0x14141a, 0.85));
-    const sol = new THREE.DirectionalLight(0xfff4e2, 1.5); sol.position.set(-3, -4, 10); S.scene.add(sol);
-    const contra = new THREE.DirectionalLight(0xff7a4a, 0.45); contra.position.set(6, 3, 3); S.scene.add(contra);
+    // com o clube quem ilumina e o clube (holofote, neon, luz do bar). Sem ele, o palco branco de antes.
+    if (window.Clube) {
+      const fraca = new THREE.DirectionalLight(0xffd9c8, 0.35); fraca.position.set(-3, -4, 10); S.scene.add(fraca);
+    } else {
+      S.scene.add(new THREE.HemisphereLight(0xffffff, 0x14141a, 0.85));
+      const sol = new THREE.DirectionalLight(0xfff4e2, 1.5); sol.position.set(-3, -4, 10); S.scene.add(sol);
+      const contra = new THREE.DirectionalLight(0xff7a4a, 0.45); contra.position.set(6, 3, 3); S.scene.add(contra);
+    }
 
     const texs = {}, mats = {}, matsE = {};
     for (const [k, m] of Object.entries(j.materiais)) {
@@ -119,6 +130,10 @@ window.Orgia = (function () {
         }
       }
     }
+    // acabamento de bicho: quitina com brilho e micro-relevo, olho composto, asa com nervura e
+    // iridescencia, perna opaca. Tem que ser AQUI, antes das malhas pegarem o material.
+    if (window.Pele) { window.Pele.melhorar(mats, matsE, j.materiais); window.Pele.ambiente(S.ren, S.scene); }
+
     const geos = j.malhas.map(ml => {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(bin, ml.off_pos, ml.nv * 3), 3));
@@ -145,8 +160,8 @@ window.Orgia = (function () {
       ime.frustumCulled = false; ime.instanceMatrix.setUsage(THREE.DynamicDrawUsage); ime.renderOrder = 0;
       S.scene.add(ime); S.instE.push(ime);
     }
-    const chao = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.82, depthWrite: false }));
-    chao.renderOrder = 1; S.scene.add(chao);
+    // o clube: chao molhado, parede de veludo, neon, bar, sofas, palco, globo e holofotes
+    if (window.Clube) S.clube = window.Clube.montar(S.scene, { pares: S.pares, raio: S.raioMax });
 
     S.qtmp = new Float32Array(S.nq); S.qEla = new Float32Array(S.nq); S.qEle = new Float32Array(S.nq);
     for (let i = 0; i < ANEL; i++) { S.anel.push(null); S.anelT.push(0); }
@@ -249,7 +264,7 @@ window.Orgia = (function () {
   function raizDela(q, par, empurrao) {
     const a = S.raiz;
     RE.set(0, 0, par.yaw); RQ.setFromEuler(RE);
-    SLOT.compose(V.set(par.x, par.y, 0), RQ, UM);
+    SLOT.compose(V.set(par.x, par.y, par.z || 0), RQ, UM);
     HER.compose(V.set(0, 0, q[a + 2]), Q.set(q[a + 4], q[a + 5], q[a + 6], q[a + 3]).normalize(), UM);
     HER.premultiply(SLOT);
     if (empurrao) { TL.makeTranslation(empurrao, 0, 0); HER.multiply(TL); }   // ela e empurrada para a frente
@@ -375,6 +390,11 @@ window.Orgia = (function () {
       if (S.reflexo) S.instE[g].instanceMatrix.needsUpdate = true;
     }
 
+    if (S.clube) {                       // o clube pulsa com o calor da sala (media da libido)
+      let soma = 0;
+      for (const x of S.pares) soma += x.libido;
+      window.Clube.animar(agora, soma / Math.max(1, S.pares.length));
+    }
     passear(agora, k);
     const o = S.orbita, a = o.alvo;
     S.cam.position.set(a[0] + o.dist * Math.cos(o.el) * Math.cos(o.az), a[1] + o.dist * Math.cos(o.el) * Math.sin(o.az), a[2] + o.dist * Math.sin(o.el));
@@ -412,10 +432,11 @@ window.Orgia = (function () {
       if (C.perto && S.pares.length) C.par = (C.par + 3) % S.pares.length;   // pula 3 para nao ficar so no anel de dentro
       C.ate = agora + (C.perto ? 13000 : 7000);
     }
-    const par = S.pares[C.par] || { x: 0, y: 0 };
-    const aX = C.perto ? par.x : 0, aY = C.perto ? par.y : 0, aZ = C.perto ? 1.45 : 1.2;
-    const dist = C.perto ? 5.4 : 15 + (S.raioMax || 3.4) * 1.55;
-    const el = C.perto ? 0.14 : 0.30;
+    const par = S.pares[C.par] || { x: 0, y: 0, z: 0 };
+    const aX = C.perto ? par.x : 0, aY = C.perto ? par.y : 0;
+    const aZ = C.perto ? (par.z || 0) + 1.45 : 3.4;                 // de longe olha a sala, nao o chao
+    const dist = C.perto ? 5.4 : (S.distLarga || 18);
+    const el = C.perto ? 0.14 : 0.34;
     const kk = k * 1.1;
     o.alvo[0] += (aX - o.alvo[0]) * kk; o.alvo[1] += (aY - o.alvo[1]) * kk; o.alvo[2] += (aZ - o.alvo[2]) * kk;
     o.dist += (dist - o.dist) * kk;
