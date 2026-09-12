@@ -615,20 +615,27 @@ def main():
             historico.append(t)
             ultimo_trade_real = agora
             if t['kind'] == 'buy':
-                acesos = coro.compra(t['usd'], p90)              # compra grande acende mais pares
-                for p in acesos:
+                alvos = coro.compra(t['usd'], p90)               # compra grande acende mais pares
+                for p in alvos:
                     if coro.pares[p].estado in ('courting', 'mating'):
                         estimular_par('jo', 300.0, p, 'ela'); estimular_par('pc1', 250.0, p, 'ela')
             else:
                 p, r = coro.venda(t['usd'], p50, p90)
+                alvos = [p]
                 if r == 'chute':
                     estimular_par('reject', 400.0, p, 'ela'); estimular_par('lc4', 400.0, p, 'ele')
                     publicar(coro.evento(f'big sell: pair {p + 1} breaks up'))
             novo_holder = t['kind'] == 'buy' and t['de'] not in enderecos
             enderecos.add(t['de'])
             lista, nome, extras = traduzir_trade(t, p50, p90, novo_holder)
+            # o negocio vai para os pares que ele mexeu. So o grande (>= p90) atravessa a sala inteira:
+            # com 32 moscas, mandar todo trade para todas deixava os 32 cerebros empurrados sem parar.
             for est, ms in lista:
-                estimular(est, ms)
+                if t['usd'] >= p90:
+                    estimular(est, ms)
+                else:
+                    for q in alvos:
+                        estimular_par(est, ms, q)
             ultimo_estimulo = (f'{t["kind"]} ${t["usd"]:,.2f}', agora)
             publicar({'classe': 'trade', 'kind': t['kind'], 'usd': round(t['usd'], 2), 'de': t['de'][:10],
                       'tx': t['tx'], 'estimulo': nome, 'ms': round(lista[0][1]), 'extra': ' + '.join(extras) or None,
