@@ -220,20 +220,22 @@ async function montarCerebros(n) {
   nreg = { cx: (xmin + xmax) / 2, cy: (ymin + ymax) / 2, cz: (zmin + zmax) / 2, r: Math.max(xmax - xmin, ymax - ymin, zmax - zmin) / 2 };
 }
 
+// Cada quadro carrega ~1,2 ms de cerebro, ou seja umas duas dezenas de disparos por mosca: se eu
+// limpasse a tela a cada quadro o cerebrinho ficaria quase vazio. Entao a tela DESBOTA em vez de
+// limpar, e o disparo fica visivel por alguns quadros - igual ao rastro do cerebro grande do SEX FLY.
 function desenharCerebro(m, idx, rot, foco, spikes_s) {
   const c = m.ctx, W = m.cv.width, H = m.cv.height;
-  c.clearRect(0, 0, W, H);
-  c.fillStyle = '#050409'; c.fillRect(0, 0, W, H);
+  c.fillStyle = 'rgba(5,4,9,0.20)'; c.fillRect(0, 0, W, H);
   if (!xyz || !nreg) return;
   const s = (W * 0.44) / nreg.r, co = Math.cos(rot), si = Math.sin(rot);
-  const quente = spikes_s > 6000, forte = spikes_s > 1200;
-  c.fillStyle = quente ? 'rgba(255,95,158,.95)' : (forte ? 'rgba(255,180,61,.9)' : 'rgba(110,139,255,.85)');
-  const raio = foco ? 1.0 : 0.9;
+  const quente = spikes_s > 25000, forte = spikes_s > 6000;
+  c.fillStyle = quente ? 'rgba(255,95,158,.98)' : (forte ? 'rgba(255,180,61,.95)' : 'rgba(126,152,255,.9)');
+  const lado = foco ? 1.7 : 1.4;
   for (let k = 0; k < idx.length; k++) {
     const j = idx[k] * 3; if (j + 2 >= xyz.length) continue;
     const x = xyz[j] - nreg.cx, y = xyz[j + 1] - nreg.cy, z = xyz[j + 2] - nreg.cz;
     const px = W / 2 + (x * co - y * si) * s, py = H / 2 - z * s;
-    c.fillRect(px, py, raio + 0.4, raio + 0.4);
+    c.fillRect(px, py, lado, lado);
   }
   m.taxa.textContent = spikes_s > 999 ? (spikes_s / 1000).toFixed(1) + 'k' : Math.round(spikes_s);
 }
