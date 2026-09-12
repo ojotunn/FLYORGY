@@ -255,8 +255,9 @@ class Estocadas(threading.Thread):
                     proximo = min(proximo, self.prox[p])
                     continue
                 periodo = 1.0 / max(0.5, lib.ritmo_hz())
-                # a salva ocupa 45% do cerebro que cabe entre duas estocadas: toque e depois silencio
-                ms = max(1.0, min(120.0, 0.45 * cerebro_ms_por_s * periodo))
+                # a salva ocupa 20% do cerebro que cabe entre duas estocadas: toque curto e silencio (45% deixava
+                # os 32 cerebros em 50 mil spikes/s, sem folga para a compra fazer diferenca)
+                ms = max(1.0, min(120.0, 0.20 * cerebro_ms_por_s * periodo))
                 self.n[p] += 1
                 estimular_par('jo', ms, p)
                 estimular_par('pc1', ms, p, 'ela')
