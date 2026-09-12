@@ -41,11 +41,15 @@ window.Orgia = (function () {
   function arranjar(nf) {
     const np = Math.floor(nf / 2); S.pares = []; S.moscas = [];
     for (let p = 0; p < np; p++) {
-      const anel = p < 3 ? 0 : (p < 8 ? 1 : 2);
-      const naAnel = anel === 0 ? Math.min(3, np) : (anel === 1 ? Math.min(5, np - 3) : np - 8);
-      const iAnel = anel === 0 ? p : (anel === 1 ? p - 3 : p - 8);
-      const r = [3.4, 7.6, 11.4][anel];
-      const a = (iAnel / Math.max(1, naAnel)) * Math.PI * 2 + [0.0, 0.55, 1.1][anel];
+      // aneis de 3, 5, 8 e 12 pares; o que sobrar vai para o de fora
+      const CAPS = [3, 5, 8, 12], RAIOS = [3.4, 7.6, 11.4, 15.6], GIROS = [0.0, 0.55, 1.1, 1.7];
+      let anel = 0, ini = 0;
+      while (anel < 3 && p >= ini + CAPS[anel]) { ini += CAPS[anel]; anel++; }
+      const naAnel = Math.min(CAPS[anel], np - ini);
+      const iAnel = p - ini;
+      const r = RAIOS[anel];
+      S.raioMax = Math.max(S.raioMax || 0, r);
+      const a = (iAnel / Math.max(1, naAnel)) * Math.PI * 2 + GIROS[anel];
       const x = Math.cos(a) * r, y = Math.sin(a) * r;
       const yaw = a + Math.PI * 0.5 + (((p * 2654435761) % 1000) / 1000 - 0.5) * 0.9;   // meio de lado, sem sorteio a cada carga
       S.pares.push({
@@ -56,6 +60,8 @@ window.Orgia = (function () {
       S.moscas.push({ par: p, papel: 'f' }, { par: p, papel: 'm' });
     }
     S.NF = S.moscas.length;
+    S.orbita.dist = 15 + (S.raioMax || 3.4) * 1.55;      // enquadra o anel de fora
+    S.reflexo = S.NF <= 16;                              // acima disso o reflexo dobra o triangulo a toa
   }
 
   async function init(canvas, nf) {

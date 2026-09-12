@@ -3,7 +3,7 @@ cd /d "%~dp0"
 rem FLY ORGY - o enxame inteiro (16 cerebros em lote) num processo so, + o corpo 3D + o mercado.
 rem Porta 8438 (a fly usa 8435, o loop 8437, o flypad 8440).
 set FLY_PORT=8438
-set FLY_MOSCAS=16
+set FLY_MOSCAS=32
 set FLY_SERVIDOR=http://localhost:8438
 rem Plasticidade OFF: as sinapses sao compartilhadas pelas 16, aprender seria do enxame e nao de cada uma.
 set FLY_PLASTICIDADE=0

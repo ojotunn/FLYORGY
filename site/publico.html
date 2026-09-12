@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FLY ORGY — a swarm of real fly brains, mating on your buys</title>
-<meta name="description" content="Sixteen whole fruit-fly connectomes, 138,639 neurons each, running live on one GPU. Every buy on the curve reaches their touch neurons and the room speeds up.">
+<title>FLY ORGY — 32 real fly brains in one room</title>
+<meta name="description" content="Thirty-two whole fruit-fly connectomes, 138,639 neurons each, running live on one GPU. Every buy on the curve reaches their touch neurons and the room speeds up.">
 <link rel="icon" href="/static/favicon.png">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="FLY ORGY">
-<meta property="og:title" content="FLY ORGY — 16 real fly brains, one room">
-<meta property="og:description" content="Sixteen whole fruit-fly connectomes on one GPU. Every buy reaches their touch neurons and the room speeds up.">
+<meta property="og:title" content="FLY ORGY — 32 real fly brains, one room">
+<meta property="og:description" content="Thirty-two whole fruit-fly connectomes on one GPU. Every buy reaches their touch neurons and the room speeds up.">
 <meta property="og:image" content="/static/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -101,7 +101,7 @@ a{color:inherit}
   <div class="pilulas">
     <span class="pil morta" id="viva"><i></i>connecting</span>
     <span class="pil" id="pViewers">watching <b>0</b></span>
-    <span class="pil" id="pPares">pairs <b>0/8</b></span>
+    <span class="pil" id="pPares">pairs <b>0</b></span>
     <a class="bt" id="btX" href="#" target="_blank" rel="noopener">X</a>
   </div>
 </div>
@@ -109,12 +109,12 @@ a{color:inherit}
 <div class="grade">
   <div>
     <div class="caixa">
-      <div class="cab"><b>THE ROOM</b> · 16 flies, 8 pairs, one GPU
+      <div class="cab"><b>THE ROOM</b> · one GPU, one brain per fly
         <span class="dir" id="camInfo"></span></div>
       <div id="palco">
         <canvas id="cv"></canvas>
         <div class="hud">
-          <div>mating <b class="q" id="hPares">0</b> / 8</div>
+          <div>mating <b class="q" id="hPares">0</b> pairs</div>
           <div>fastest <b id="hRitmo">0</b> Hz</div>
           <div>swarm <b id="hSpikes">0</b> spikes/s</div>
           <div>brain speed <b id="hPassos">0</b> steps/s</div>
@@ -124,7 +124,7 @@ a{color:inherit}
     </div>
 
     <div class="caixa" style="margin-top:14px">
-      <div class="cab"><b>16 BRAINS</b> · one dot = one neuron that just fired
+      <div class="cab"><b>EVERY BRAIN</b> · one dot = one neuron that just fired
         <span class="dir" id="focoInfo">full cloud rotates between them</span></div>
       <div class="cerebros" id="cerebros"></div>
     </div>
@@ -152,7 +152,7 @@ a{color:inherit}
     <h2>What you are looking at</h2>
     <div class="duas">
       <div>
-        <p>Sixteen fruit flies are in that room. Each one has a <b>whole brain</b>: 138,639 neurons and
+        <p>Thirty-two fruit flies are in that room, sixteen couples. Each one has a <b>whole brain</b>: 138,639 neurons and
            15,091,983 synapses, wired exactly the way they are wired in a real <i>Drosophila melanogaster</i>,
            from the FlyWire connectome. They run as leaky integrate-and-fire neurons on one GPU, in real
            electrical time, 0.1 ms per step.</p>
@@ -168,15 +168,15 @@ a{color:inherit}
            hottest female and she kicks him off.</p>
       </div>
       <div>
-        <h3>Why sixteen brains fit on one card</h3>
+        <h3>Why thirty-two brains fit on one card</h3>
         <p>The expensive part of a connectome is the synapse matrix, and it is the same matrix for every fly.
-           So the sixteen brains share one copy of it and each fly is a row of the state tensor: 27 MB of
-           membrane state each instead of 1.3 GB. Measured on the card that runs this: 16 brains at 161 steps
-           per second, 0.60 GB total — faster per brain than running two of them separately.</p>
+           So the thirty-two brains share one copy of it and each fly is a row of the state tensor: 27 MB of
+           membrane state each instead of 1.3 GB. Measured on the RTX 4090 that runs this: one brain alone does
+           2,328 steps per second, thirty-two do 127 each — the same speed SEX FLY runs two at — in 1.03 GB.</p>
         <h3>What is honest here</h3>
         <p>The brains are real and independent: stimulate fly 3 and only fly 3 fires. The bodies are the same
-           anatomical model (NeuroMechFly) drawn sixteen times, each reading the pose stream at its own delay,
-           with its pair's own rhythm on top — so the legs and wings are real fly kinematics, not sixteen
+           anatomical model (NeuroMechFly) drawn thirty-two times, each reading the pose stream at its own delay,
+           with its pair's own rhythm on top — so the legs and wings are real fly kinematics, not thirty-two
            separate physics simulations.</p>
         <p>Learning is <b>off</b>. Hebbian plasticity would change the shared synapse matrix, which would mean
            the swarm learning together instead of each fly learning alone, and we are not going to call that
@@ -193,14 +193,17 @@ a{color:inherit}
 <script src="/static/orgia-cliente.js"></script>
 <script>
 const $ = id => document.getElementById(id);
-const NF = 16, NP = 8;
+let NF = 0, NP = 0;                 // vem do 'ola' do servidor
 let xyz = null, nreg = null, ultimoQuadro = 0, versao = null;
 const minis = [];
 
 // ---------- cerebrinhos: projecao 2D dos neuronios que dispararam, girando junto ----------
-async function montarCerebros() {
-  xyz = new Float32Array(await (await fetch('/static/neurons.bin')).arrayBuffer());
+async function montarCerebros(n) {
+  NF = n; NP = n >> 1;
+  if (!xyz) xyz = new Float32Array(await (await fetch('/static/neurons.bin')).arrayBuffer());
   const cx = $('cerebros');
+  cx.innerHTML = ''; minis.length = 0;
+  cx.style.gridTemplateColumns = 'repeat(' + (NF > 16 ? 8 : 4) + ',1fr)';
   for (let i = 0; i < NF; i++) {
     const d = document.createElement('div'); d.className = 'mini'; d.id = 'mini' + i;
     d.innerHTML = '<canvas width="150" height="150"></canvas><span>' + (i % 2 ? 'M' : 'F') + (Math.floor(i / 2) + 1) + '</span><u></u>';
@@ -271,7 +274,11 @@ function binario(buf) {
 }
 
 function texto(m) {
-  if (m.tipo === 'ola') { $('camInfo').textContent = m.moscas + ' brains · ' + fmt(m.synapses) + ' synapses each · ' + (m.device || '').toUpperCase(); return; }
+  if (m.tipo === 'ola') {
+    $('camInfo').textContent = m.moscas + ' brains · ' + fmt(m.synapses) + ' synapses each · ' + (m.device || '').toUpperCase();
+    if (m.moscas !== NF) { montarCerebros(m.moscas).then(() => Orgia.init($('cv'), m.moscas)); }
+    return;
+  }
   if (m.tipo === 'config') { config(m); return; }
   if (m.tipo !== 'mercado') return;
   if (m.classe === 'resumo') { resumo(m); return; }
@@ -337,11 +344,7 @@ const dinheiro = n => n >= 1e6 ? '$' + (n / 1e6).toFixed(2) + 'M' : (n >= 1e3 ? 
 const hora = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const esc = s => String(s == null ? '' : s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
 
-(async () => {
-  await montarCerebros();
-  Orgia.init($('cv'), NF);
-  ligar();
-})();
+ligar();   // o 'ola' diz quantas moscas sao e so entao monta a sala e os cerebrinhos
 </script>
 </body>
 </html>
