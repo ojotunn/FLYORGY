@@ -475,6 +475,7 @@ window.Orgia = (function () {
   return {
     init, quadro, sexo, dn, brilho,
     sugerirPar: (p) => { S.parSugerido = p; },
+    parInfo: (i) => S.pares[i],
     parNaCamera: () => S.tour.par,
     perto: () => S.tour.perto,
     estado: () => ({ fps: S.fps, moscas: S.NF, pares: S.pares.length, reflexo: S.reflexo, erro: S.erro,

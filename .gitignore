@@ -10,7 +10,6 @@ mercado/carteira-antiga/
 mercado/ultimo_token.txt
 *.log
 relay.token
-relay.dominio
 runpod.key
 pod.id
 pod.ssh

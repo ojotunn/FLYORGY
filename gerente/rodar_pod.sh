@@ -22,6 +22,10 @@ export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl
 export FLY_MERCADO_MODO="${FLY_MERCADO_MODO:-papel}"
 export FLY_MERCADO_ORDENS="${FLY_MERCADO_ORDENS:-off}"   # o FLY ORGY nao opera: o mercado so vira estimulo
 export PYTHONUNBUFFERED=1
+# relay publico no Railway: o endereco fica em relay.dominio (no git) e o token em relay.token (FORA do
+# git; o mesmo valor esta na variavel FLY_RELAY_TOKEN do servico la). Sem o token o relay recusa a fonte.
+[ -f relay.dominio ] && export FLY_RELAY_URL="$(cat relay.dominio)"
+[ -f relay.token ] && export FLY_RELAY_TOKEN="$(cat relay.token)"
 
 # reinicia sozinho se cair (o mesmo padrao do FLY PAD)
 laco() {

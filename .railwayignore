@@ -1,0 +1,13 @@
+py/
+brain/
+corpo/
+mercado/
+gerente/
+brand/
+__pycache__/
+*.pyc
+relay.token
+runpod.key
+pod.id
+pod.ssh
+START-Windows.bat

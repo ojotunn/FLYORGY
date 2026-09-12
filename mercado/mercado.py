@@ -10,6 +10,7 @@ import asyncio
 import json
 import math
 import os
+import random
 import struct
 import sys
 import threading
@@ -192,26 +193,83 @@ def limiares(historico):
     return v[len(v) // 2], v[int(len(v) * 0.9)]
 
 
-def traduzir_trade(t, p50, p90, novo_holder):
+FALA = {
+    'compra_pequena': [
+        'someone breathes on the room and pair {p} shivers',
+        'a little taste. pair {p} arches her back',
+        'pair {p} feels a hand on her and opens up',
+        'not much, but pair {p} is already wet',
+    ],
+    'compra_media': [
+        'pair {p} takes it harder, he grabs her hips',
+        'he sinks in deeper. pair {p} stops pretending',
+        'pair {p} picks up the pace, wings shaking',
+        'she pushes back into him. pair {p} is going for it',
+    ],
+    'compra_grande': [
+        'the WHOLE room screams. every couple goes at once',
+        'someone paid for the whole floor. sixteen couples, one rhythm',
+        'the room comes together. dopamine everywhere',
+        'lights down, everybody moving. the floor is soaked',
+    ],
+    'holder_novo': [
+        'fresh meat walks in. pair {p} turns around to look',
+        'new face at the door. pair {p} makes room on the couch',
+        'somebody new is watching. pair {p} puts on a show',
+    ],
+    'venda_pequena': [
+        'pair {p} goes soft for a second',
+        'somebody got up to leave. pair {p} loses the rhythm',
+        'pair {p} slows down, catching her breath',
+    ],
+    'venda_media': [
+        'he pulls out halfway. pair {p} is not happy',
+        'pair {p} stops mid-stroke and looks at the door',
+        'that one hurt. pair {p} goes cold',
+    ],
+    'venda_grande': [
+        'she throws him off mid-thrust. pair {p} is done',
+        'pair {p} breaks up right there on the floor',
+        'he gets kicked across the room. pair {p} is over',
+    ],
+    'sala': [
+        '{n} of {t} couples going at it right now',
+        '{n} couples on the floor, nobody watching the door',
+        'the floor is busy: {n} of {t} at it',
+        '{n} couples moving. the room smells like sugar',
+    ],
+}
+
+
+def falar(chave, **kw):
+    return random.choice(FALA[chave]).format(**kw)
+
+
+def traduzir_trade(t, p50, p90, novo_holder, par=None):
     """Mapa publico mercado -> sentidos. Devolve lista de (estimulo, ms) e um rotulo curto para o card.
     compra = acucar (duracao pelo valor); compra grande ou holder novo = + dopamina;
     venda = amargo; venda media = + empurrao de re; venda grande = + sombra."""
     ms = ms_por_valor(t['usd'])
+    p = (par if par is not None else 0) + 1
     if t['kind'] == 'buy':
         lista = [('sugar', ms)]
-        extras = []
         if t['usd'] >= p90:
-            lista.append(('reward', 500.0)); extras.append('big buy → she screams, dopamine floods both brains')
+            lista.append(('reward', 500.0)); fala = falar('compra_grande')
         elif novo_holder:
-            lista.append(('reward', 300.0)); extras.append('new holder → dopamine hit')
-        return lista, 'sugar', extras
+            lista.append(('reward', 300.0)); fala = falar('holder_novo', p=p)
+        elif t['usd'] >= p50:
+            fala = falar('compra_media', p=p)
+        else:
+            fala = falar('compra_pequena', p=p)
+        return lista, 'sugar', [fala]
     lista = [('bitter', ms)]
-    extras = []
     if t['usd'] >= p90:
-        lista.append(('lc4', 400.0)); extras.append('big sell → she kicks him off')
+        lista.append(('lc4', 400.0)); fala = falar('venda_grande', p=p)
     elif t['usd'] >= p50:
-        lista.append(('mdn', 300.0)); extras.append('sell → he slows down')
-    return lista, 'bitter', extras
+        lista.append(('mdn', 300.0)); fala = falar('venda_media', p=p)
+    else:
+        fala = falar('venda_pequena', p=p)
+    return lista, 'bitter', [fala]
 
 
 class Estocadas(threading.Thread):
@@ -637,10 +695,10 @@ def main():
                 alvos = [p]
                 if r == 'chute':
                     estimular_par('reject', 400.0, p, 'ela'); estimular_par('lc4', 400.0, p, 'ele')
-                    publicar(coro.evento(f'big sell: pair {p + 1} breaks up'))
+                    publicar(coro.evento(falar('venda_grande', p=p + 1)))
             novo_holder = t['kind'] == 'buy' and t['de'] not in enderecos
             enderecos.add(t['de'])
-            lista, nome, extras = traduzir_trade(t, p50, p90, novo_holder)
+            lista, nome, extras = traduzir_trade(t, p50, p90, novo_holder, par=(alvos[0] if alvos else 0))
             # o negocio vai para os pares que ele mexeu. So o grande (>= p90) atravessa a sala inteira:
             # com 32 moscas, mandar todo trade para todas deixava os 32 cerebros empurrados sem parar.
             for est, ms in lista:
@@ -658,12 +716,12 @@ def main():
         if len(recentes) >= 6 and agora - ultimo_jo > 60:
             ultimo_jo = agora
             estimular('jo', 300.0)
-            publicar({'classe': 'sinal', 'texto': f'{len(recentes)} trades in a minute → vibration', 'estimulo': 'jo'})
+            publicar({'classe': 'sinal', 'texto': f'{len(recentes)} trades in a minute. the whole floor is vibrating', 'estimulo': 'jo'})
         vendas_min = [t for t in recentes if t['kind'] == 'sell']
         if len(vendas_min) >= 4 and agora - ultimo_lc4 > 120:
             ultimo_lc4 = agora
             estimular('lc4', 500.0)
-            publicar({'classe': 'sinal', 'texto': f'{len(vendas_min)} sells in a minute → shadow', 'estimulo': 'lc4'})
+            publicar({'classe': 'sinal', 'texto': f'{len(vendas_min)} sells in a minute. a shadow crosses the room and everybody freezes', 'estimulo': 'lc4'})
 
     def tendencia_posicao(serie):
         """O token que ela OPERA (e segura): cair 2 % em 5 min = empurrao de re; cair 5 % = sombra (fuga = vende).
@@ -695,7 +753,7 @@ def main():
             if var >= 0.02:
                 ultimo_p9 = agora
                 estimular('p9', 400.0)
-                publicar({'classe': 'sinal', 'texto': f'price +{var * 100:.1f}% in 5 min → walk drive', 'estimulo': 'p9'})
+                publicar({'classe': 'sinal', 'texto': f'price +{var * 100:.1f}% in 5 min. the room is getting greedy', 'estimulo': 'p9'})
             elif var <= -0.02:
                 ultimo_p9 = agora
                 estimular('mdn', 400.0)
@@ -751,7 +809,7 @@ def main():
                 except Exception:
                     pass
                 print(f'[mercado] token escolhido: {pool["nome"]} ({pool["par"]}) pool {pool["pool"]} token {pool.get("token")}', flush=True)
-                publicar({'classe': 'info', 'texto': f'watching {pool["nome"]} on Pons, the busiest curve right now'})
+                publicar({'classe': 'info', 'texto': f'no token of our own yet, so the room is riding {pool["nome"]} on Pons, the busiest curve right now'})
         if pool is not None and agora - ultima_leitura >= INTERVALO and proibido(pool):
             # o token que ela olha entrou na lista de vetados (o dela acabou de ser lancado): larga na hora
             print(f'[mercado] {pool["nome"]} entrou na lista de vetados; ela larga e escolhe outro', flush=True)
@@ -766,7 +824,7 @@ def main():
         if mudou or agora - coro.t_pub >= 2.0:
             coro.t_pub = agora
             n = sum(1 for l in coro.pares if l.estado == 'mating')
-            publicar(coro.evento(f'{n} of {coro.n} pairs going at it' if mudou else None))
+            publicar(coro.evento(falar('sala', n=n, t=coro.n) if mudou else None))
         if pool is None:
             time.sleep(INTERVALO)
             continue

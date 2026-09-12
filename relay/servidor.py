@@ -1,4 +1,4 @@
-# Relay publico do FLY (roda no Railway): o PC do Michel, onde o cerebro e o corpo rodam, conecta em /fonte e
+# Relay publico do FLY ORGY (roda no Railway): o PC do Michel, onde o cerebro e o corpo rodam, conecta em /fonte e
 # manda os quadros; os espectadores conectam em /ws e recebem o mesmo protocolo da pagina local. Serve tambem a
 # pagina publica e os dados estaticos (neuronios, casca, modelo da mosca). Nao ha /dev nem estimulo aqui:
 # o publico so assiste. Cada espectador tem uma fila curta; se a conexao dele atrasa, perde quadros, nao acumula.
@@ -192,7 +192,12 @@ async def api_mercado(request):
 async def versao(request):
     """Assinatura da pagina servida: a pagina compara a cada minuto e recarrega sozinha quando muda."""
     import hashlib
-    h = hashlib.md5((SITE / 'publico.html').read_bytes() + (SITE / 'fly-cliente.js').read_bytes()).hexdigest()[:12]
+    dados = b''
+    for nome in ('publico.html', 'orgia-cliente.js', 'clube.js', 'pele.js'):
+        arq = SITE / nome
+        if arq.exists():
+            dados += arq.read_bytes()
+    h = hashlib.md5(dados).hexdigest()[:12]
     return web.Response(text=h, content_type='text/plain', headers={'Cache-Control': 'no-store'})
 
 
@@ -206,9 +211,6 @@ async def saude(request):
 async def index(request):
     """Pagina publica com o CA do token e o link do X vindos das variaveis do servico (FLY_CA, FLY_X_URL):
     mudar a variavel no Railway redeploya em um minuto, sem mexer em codigo."""
-    host = (request.headers.get('Host') or '').split(':')[0].lower()
-    if host == 'sexfly.tech':          # o Railway so aceitou o www: a raiz manda para la
-        raise web.HTTPMovedPermanently('https://www.sexfly.tech/')
     html = (SITE / 'publico.html').read_text(encoding='utf-8')
     cfg = request.app['estado'].get('config') or {}
     ca = (cfg.get('ca') or os.environ.get('FLY_CA', '')).strip().replace("'", '')
