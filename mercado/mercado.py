@@ -224,11 +224,30 @@ class Estocadas(threading.Thread):
         self.coro = coro
         self.n = [0] * coro.n
         self.prox = [0.0] * coro.n
+        self.passos_s = 120.0        # velocidade do cerebro, relida do servidor
+        self.t_passos = 0.0
+
+    def ler_passos(self):
+        """Quantos passos de cerebro por segundo de parede. Sem isto nao da para saber quanto tempo de
+        CEREBRO cabe entre duas estocadas, e a salva vira empurrao continuo."""
+        agora = time.time()
+        if agora - self.t_passos < 10.0:
+            return
+        self.t_passos = agora
+        try:
+            d = http_json(SERVIDOR + '/api/estado', timeout=5)
+            if d.get('steps_per_s'):
+                self.passos_s = max(5.0, float(d['steps_per_s']))
+        except Exception:
+            pass
 
     def run(self):
         while True:
+            self.ler_passos()
             agora = time.time()
             proximo = agora + 0.25
+            # ms de cerebro que passam num segundo de parede (DT = 0,1 ms por passo)
+            cerebro_ms_por_s = self.passos_s * 0.1
             for p, lib in enumerate(self.coro.pares):
                 if lib.estado != 'mating':
                     continue
@@ -236,12 +255,13 @@ class Estocadas(threading.Thread):
                     proximo = min(proximo, self.prox[p])
                     continue
                 periodo = 1.0 / max(0.5, lib.ritmo_hz())
-                ms = int(min(250.0, 600.0 * periodo))
+                # a salva ocupa 45% do cerebro que cabe entre duas estocadas: toque e depois silencio
+                ms = max(1.0, min(120.0, 0.45 * cerebro_ms_por_s * periodo))
                 self.n[p] += 1
                 estimular_par('jo', ms, p)
                 estimular_par('pc1', ms, p, 'ela')
                 if self.n[p] % 4 == 0:
-                    estimular_par('reward', int(150 + 350 * lib.v), p)
+                    estimular_par('reward', ms * (1.0 + 2.0 * lib.v), p)
                 self.prox[p] = agora + periodo
                 proximo = min(proximo, self.prox[p])
             time.sleep(max(0.005, min(0.25, proximo - time.time())))

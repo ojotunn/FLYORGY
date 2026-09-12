@@ -37,7 +37,8 @@ HEBB_BATCH = 10
 HEBB_ETA = 1e-4
 HEBB_ALPHA = 1e-7
 
-MS_MIN, MS_MAX = 50.0, 5000.0
+MS_MIN, MS_MAX = 1.0, 5000.0     # 1 ms = 10 passos: salva curta de verdade (o SEX FLY nao precisava
+                                 # disto porque era um casal; com 16 pares o toque so nao pode ser continuo)
 JANELA_QUADROS = 8
 
 CRISE_SPIKES_S = 100_000.0
