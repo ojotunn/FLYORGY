@@ -268,9 +268,19 @@ class Estocadas(threading.Thread):
             time.sleep(max(0.005, min(0.25, proximo - time.time())))
 
 
+# Teto de duracao dos estimulos, em ms de CEREBRO. O cerebro anda ~90x mais devagar que o relogio
+# (110 passos/s x 0,1 ms = 11 ms de cerebro por segundo de parede), entao um estimulo de 400 ms de
+# cerebro dura 36 SEGUNDOS na tela: deixa de ser evento e vira zumbido. Medido em 12/09: 'bitter' e
+# 'mdn' das leituras de tendencia ficavam ligados nas 32 moscas o tempo todo e seguravam o enxame em
+# 46 mil spikes/s. Com o teto, tendencia vira um susto de alguns segundos e a compra volta a aparecer.
+TETO_MS = float(os.environ.get('FLY_ESTIMULO_TETO', '150'))          # ~13 s de parede numa mosca so
+TETO_MS_TODAS = float(os.environ.get('FLY_ESTIMULO_TETO_TODAS', '60'))   # ~5 s de parede na sala inteira
+
+
 def estimular(nome, ms, mosca=-1):
     """Manda o estimulo para uma mosca do enxame (indice) ou para todas (-1).
     Par p = mosca 2p (femea) e mosca 2p+1 (macho), a mesma conta do site."""
+    ms = min(float(ms), TETO_MS_TODAS if int(mosca) < 0 else TETO_MS)
     try:
         http_json(SERVIDOR + '/api/estimulo', {'estimulo': nome, 'ms': ms, 'mosca': int(mosca)}, timeout=5)
         return True
