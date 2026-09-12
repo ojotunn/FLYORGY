@@ -1,0 +1,16 @@
+py/
+brain/data/flywire/
+brain/data/estado/
+brain/data/gravacao/
+__pycache__/
+*.pyc
+mercado/carteira.json
+mercado/carteira.senha
+mercado/carteira-antiga/
+mercado/ultimo_token.txt
+*.log
+relay.token
+relay.dominio
+runpod.key
+pod.id
+pod.ssh
