@@ -8,7 +8,7 @@
 // Clube.montar(scene, {pares, raio}) devolve os pedacos que se mexem;
 // Clube.animar(t, calor) gira o globo, varre os holofotes e pulsa o neon com o calor da sala (0..1).
 window.Clube = (function () {
-  const C = { globo: null, feixes: [], neon: [], luzes: [], fumaca: [], piso: null, raio: 26 };
+  const C = { globo: null, feixes: [], neon: [], luzes: [], fumaca: [], piso: null, raio: 26, brilho: 1, ceu: null };
   const COR_Q = 0xff2f2a, COR_R = 0xff4f96, COR_A = 0x4d6bff, COR_M = 0xffb43d;
 
   // ---------- texturas desenhadas na hora ----------
@@ -21,9 +21,9 @@ window.Clube = (function () {
   function texPiso() {   // chao molhado: escuro, com um halo quente no meio e riscos de luz
     return canvas(512, 512, (x, w, h) => {
       const g = x.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, w / 2);
-      g.addColorStop(0, '#2a0d10'); g.addColorStop(0.45, '#140609'); g.addColorStop(1, '#08040a');
+      g.addColorStop(0, '#4a1a1e'); g.addColorStop(0.45, '#27101a'); g.addColorStop(1, '#150a12');
       x.fillStyle = g; x.fillRect(0, 0, w, h);
-      x.globalAlpha = 0.10; x.strokeStyle = '#ff6a4a'; x.lineWidth = 2;
+      x.globalAlpha = 0.16; x.strokeStyle = '#ff8a68'; x.lineWidth = 2;
       for (let i = 0; i < 26; i++) { x.beginPath(); x.moveTo(Math.random() * w, 0); x.lineTo(Math.random() * w, h); x.stroke(); }
       x.globalAlpha = 1;
     });
@@ -31,13 +31,13 @@ window.Clube = (function () {
 
   function texParede() {  // veludo com listras verticais
     return canvas(256, 512, (x, w, h) => {
-      x.fillStyle = '#160a12'; x.fillRect(0, 0, w, h);
+      x.fillStyle = '#2a1220'; x.fillRect(0, 0, w, h);
       for (let i = 0; i < w; i += 16) {
-        x.fillStyle = i % 32 ? 'rgba(70,20,44,.55)' : 'rgba(28,8,20,.6)';
+        x.fillStyle = i % 32 ? 'rgba(120,36,74,.6)' : 'rgba(52,16,36,.6)';
         x.fillRect(i, 0, 14, h);
       }
       const g = x.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, 'rgba(0,0,0,.85)'); g.addColorStop(0.55, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.7)');
+      g.addColorStop(0, 'rgba(0,0,0,.6)'); g.addColorStop(0.55, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.45)');
       x.fillStyle = g; x.fillRect(0, 0, w, h);
     });
   }
@@ -77,13 +77,13 @@ window.Clube = (function () {
     const R = C.raio = Math.max(17, ((opts && opts.raio) || 12) + 7.5);   // parede folgada em volta do anel de fora
     const ALT = 14;
 
-    scene.fog = new THREE.FogExp2(0x0b0409, 0.0135);      // fumaca: da profundidade e some com a borda da sala
+    scene.fog = new THREE.FogExp2(0x1a0a12, 0.0092);      // fumaca: da profundidade e some com a borda da sala
     scene.background = new THREE.Color(0x07040a);
 
     // chao molhado
     const tp = texPiso(); tp.wrapS = tp.wrapT = THREE.RepeatWrapping; tp.repeat.set(3, 3);
     const piso = new THREE.Mesh(new THREE.CircleGeometry(R * 1.25, 64),
-      new THREE.MeshStandardMaterial({ map: tp, roughness: 0.22, metalness: 0.55, color: 0xffffff }));
+      new THREE.MeshStandardMaterial({ map: tp, roughness: 0.26, metalness: 0.45, color: 0xffffff }));
     piso.renderOrder = 1; scene.add(piso); C.piso = piso;
 
     // parede em volta (cilindro por dentro) e teto
@@ -185,14 +185,16 @@ window.Clube = (function () {
       g.add(f);
       g.position.set(Math.cos(i * Math.PI / 2) * (R * 0.55), Math.sin(i * Math.PI / 2) * (R * 0.55), ALT - 0.6);
       scene.add(g); C.feixes.push({ g, f, fase: i * 1.6 });
-      const l = new THREE.PointLight(cores[i], 22, R * 1.2, 2.0);
+      const l = new THREE.PointLight(cores[i], 42, R * 1.6, 1.7);
       l.position.copy(g.position); scene.add(l); C.luzes.push(l);
     }
 
     // ambiente: fraco, cor de sala escura
-    scene.add(new THREE.HemisphereLight(0x53304a, 0x0a0509, 0.55));
-    const quente = new THREE.PointLight(COR_Q, 30, R * 1.4, 2.0);
+    scene.add(C.ceu = new THREE.HemisphereLight(0x7a4a66, 0x1a1016, 1.15));
+    const quente = new THREE.PointLight(COR_Q, 55, R * 1.8, 1.7);
     quente.position.set(0, 0, 6.5); scene.add(quente); C.luzes.push(quente);
+    const frio = new THREE.PointLight(COR_A, 26, R * 1.6, 1.8);
+    frio.position.set(0, -R * 0.5, 9.0); scene.add(frio); C.luzes.push(frio);
 
     return C;
   }
@@ -206,7 +208,7 @@ window.Clube = (function () {
       const v = 0.35 + 0.9 * c;
       f.g.rotation.z = s * v * (i % 2 ? 1 : -1) + f.fase;
       f.g.rotation.x = 0.34 + 0.16 * Math.sin(s * v * 1.7 + f.fase);
-      f.f.material.opacity = 0.04 + 0.05 * c + 0.012 * Math.sin(s * 6 + f.fase);
+      f.f.material.opacity = (0.055 + 0.06 * c + 0.015 * Math.sin(s * 6 + f.fase)) * C.brilho;
     }
     const pulso = 0.72 + 0.28 * Math.sin(s * (2.2 + 4 * c));
     for (const x of C.neon) {
@@ -216,9 +218,16 @@ window.Clube = (function () {
     }
     for (const l of C.luzes) {
       if (l.userData.base == null) l.userData.base = l.intensity;
-      l.intensity = l.userData.base * (0.7 + 0.6 * c);
+      l.intensity = l.userData.base * (0.7 + 0.6 * c) * C.brilho;
+    }
+    if (C.ceu) {
+      if (C.ceu.userData.base == null) C.ceu.userData.base = C.ceu.intensity;
+      C.ceu.intensity = C.ceu.userData.base * C.brilho;
     }
   }
 
-  return { montar, animar, estado: C };
+  // brilho da sala, 0,5 a 2,2 (o visitante escolhe; fica salvo no navegador dele)
+  function brilho(v) { C.brilho = Math.max(0.5, Math.min(2.2, v || 1)); return C.brilho; }
+
+  return { montar, animar, brilho, estado: C };
 })();

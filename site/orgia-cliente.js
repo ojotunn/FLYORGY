@@ -30,6 +30,7 @@ window.Orgia = (function () {
     inst: [], instE: [], locais: [], matriz: [], matrizM: [], matrizC: [], qtmp: null, qEla: null, qEle: null,
     anel: [], anelT: [], anelN: 0, ultimo: 0, erro: null,
     NF: 0, pares: [], moscas: [], reflexo: true, raioMax: 0, clube: null, distLarga: 18,
+    brilho: 1, fill: null, fill2: null, parSugerido: -1,
     fps: 60, fpsT: 0, fpsN: 0, degrau: 0, ruim: 0, aquece: 0,
     orbita: { az: 0.7, el: 0.30, dist: 26, alvo: [0, 0, 1.2], vel: 0.10 },
     // a camera PASSEIA: fica em cima de um casal por 13 s (da para ver a bombada) e abre a sala por 7 s.
@@ -101,12 +102,13 @@ window.Orgia = (function () {
     S.nq = j.nq; S.fovy = (j.cam && j.cam.fovy) || 45;
     S.ren = new THREE.WebGLRenderer({ canvas: S.canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
     S.ren.setClearColor(0x000000, 1); S.ren.outputColorSpace = THREE.SRGBColorSpace;
-    S.ren.toneMapping = THREE.ACESFilmicToneMapping; S.ren.toneMappingExposure = 1.25;
+    S.ren.toneMapping = THREE.ACESFilmicToneMapping; S.ren.toneMappingExposure = 1.25 * S.brilho;
     S.scene = new THREE.Scene(); S.scene.background = new THREE.Color(0x000000);
     S.cam = new THREE.PerspectiveCamera(S.fovy, 2, 0.3, 900); S.cam.up.set(0, 0, 1);
     // com o clube quem ilumina e o clube (holofote, neon, luz do bar). Sem ele, o palco branco de antes.
     if (window.Clube) {
-      const fraca = new THREE.DirectionalLight(0xffd9c8, 0.35); fraca.position.set(-3, -4, 10); S.scene.add(fraca);
+      S.fill = new THREE.DirectionalLight(0xffd9c8, 0.62); S.fill.position.set(-3, -4, 10); S.scene.add(S.fill);
+      S.fill2 = new THREE.DirectionalLight(0xbfd0ff, 0.30); S.fill2.position.set(5, 4, 6); S.scene.add(S.fill2);
     } else {
       S.scene.add(new THREE.HemisphereLight(0xffffff, 0x14141a, 0.85));
       const sol = new THREE.DirectionalLight(0xfff4e2, 1.5); sol.position.set(-3, -4, 10); S.scene.add(sol);
@@ -429,7 +431,11 @@ window.Orgia = (function () {
     const o = S.orbita, C = S.tour;
     if (agora >= C.ate) {
       C.perto = !C.perto;
-      if (C.perto && S.pares.length) C.par = (C.par + 3) % S.pares.length;   // pula 3 para nao ficar so no anel de dentro
+      if (C.perto && S.pares.length) {
+        // vai para o casal que o servidor esta olhando (o cerebro mais ativo da hora); se nao houver
+        // sugestao, anda 3 casas para nao ficar so no anel de dentro
+        C.par = S.parSugerido >= 0 ? S.parSugerido % S.pares.length : (C.par + 3) % S.pares.length;
+      }
       C.ate = agora + (C.perto ? 13000 : 7000);
     }
     const par = S.pares[C.par] || { x: 0, y: 0, z: 0 };
@@ -456,8 +462,21 @@ window.Orgia = (function () {
     else if (S.degrau === 1 && S.fps < 30) { S.degrau = 2; S.ruim = 0; redimensionar(); console.warn('orgia: resolucao menor,', S.fps.toFixed(0), 'fps'); }
   }
 
+  // brilho: 0,5 a 2,2. Mexe na exposicao, nas luzes de preenchimento e no clube.
+  function brilho(v) {
+    S.brilho = Math.max(0.5, Math.min(2.2, +v || 1));
+    if (S.ren) S.ren.toneMappingExposure = 1.25 * S.brilho;
+    if (S.fill) S.fill.intensity = 0.62 * S.brilho;
+    if (S.fill2) S.fill2.intensity = 0.30 * S.brilho;
+    if (window.Clube) window.Clube.brilho(S.brilho);
+    return S.brilho;
+  }
+
   return {
-    init, quadro, sexo, dn,
+    init, quadro, sexo, dn, brilho,
+    sugerirPar: (p) => { S.parSugerido = p; },
+    parNaCamera: () => S.tour.par,
+    perto: () => S.tour.perto,
     estado: () => ({ fps: S.fps, moscas: S.NF, pares: S.pares.length, reflexo: S.reflexo, erro: S.erro,
                      estados: S.pares.map(x => x.estado), cal: S.pares[0] && S.pares[0].cal }),
     camera: (o) => Object.assign(S.orbita, o || {}),

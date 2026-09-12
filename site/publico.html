@@ -20,6 +20,7 @@
   --texto:#f5ecec; --fraco:#9a8d96; --quente:#ff3d2e; --rosa:#ff5f9e; --mel:#ffb43d; --frio:#6e8bff;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}   /* senao display:flex vence o atributo hidden */
 body{margin:0;background:var(--preto);color:var(--texto);font:14px/1.55 'JetBrains Mono',ui-monospace,Menlo,monospace;-webkit-font-smoothing:antialiased}
 a{color:inherit}
 .topo{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
@@ -58,6 +59,17 @@ a{color:inherit}
 .aviso{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
   padding:24px;font-size:13px;color:var(--fraco);background:rgba(5,4,8,.86)}
 .aviso.some{display:none}
+/* os dois cerebros do casal que a camera esta olhando, por cima da cena */
+.foco{position:absolute;right:12px;top:12px;display:flex;gap:8px;background:rgba(7,6,10,.66);
+  border:1px solid var(--linha2);border-radius:12px;padding:9px 10px;backdrop-filter:blur(4px)}
+.foco figure{margin:0;text-align:center}
+.foco canvas{width:118px;height:118px;display:block;border:1px solid var(--linha);border-radius:9px;background:#050409}
+.foco figcaption{font-size:9.5px;letter-spacing:1.2px;color:#8b7f88;margin-top:4px;text-transform:uppercase}
+.foco figcaption b{color:var(--quente);font-weight:700}
+.foco .tit{position:absolute;left:12px;top:-1px;transform:translateY(-100%);font-size:10px;color:#8b7f88}
+@media(max-width:720px){.foco canvas{width:82px;height:82px}}
+.brilho{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--linha2);border-radius:999px;padding:3px 11px;font-size:11px;color:var(--fraco)}
+.brilho input{width:82px;accent-color:var(--quente)}
 
 .cerebros{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px}
 .mini{position:relative;aspect-ratio:1;border:1px solid var(--linha);border-radius:9px;background:#050409;overflow:hidden}
@@ -102,6 +114,7 @@ a{color:inherit}
     <span class="pil morta" id="viva"><i></i>connecting</span>
     <span class="pil" id="pViewers">watching <b>0</b></span>
     <span class="pil" id="pPares">pairs <b>0</b></span>
+    <label class="brilho" title="brightness">☀<input id="brilho" type="range" min="0.6" max="2.0" step="0.05" value="1"></label>
     <a class="bt" id="btX" href="#" target="_blank" rel="noopener">X</a>
   </div>
 </div>
@@ -118,6 +131,10 @@ a{color:inherit}
           <div>fastest <b id="hRitmo">0</b> Hz</div>
           <div>swarm <b id="hSpikes">0</b> spikes/s</div>
           <div>brain speed <b id="hPassos">0</b> steps/s</div>
+        </div>
+        <div class="foco" id="painelFoco" hidden>
+          <figure><canvas id="cvF" width="236" height="236"></canvas><figcaption>her · <b id="tF">0</b></figcaption></figure>
+          <figure><canvas id="cvM" width="236" height="236"></canvas><figcaption>his · <b id="tM">0</b></figcaption></figure>
         </div>
         <div class="aviso" id="aviso">waking the swarm up…</div>
       </div>
@@ -272,10 +289,38 @@ function binario(buf) {
     desenharCerebro(m, idx, rot, i === j.foco, info.spikes_per_s || 0);
   }
   Orgia.dn(j.moscas);                 // o cerebro do macho acelera a estocada dele
+  desenharFoco(j, buf, len, rot);     // os dois cerebros do casal que a camera esta olhando
+  Orgia.sugerirPar(Math.floor((j.foco || 0) / 2));   // a camera vai para quem esta disparando mais
   $('hSpikes').textContent = fmt(j.spikes_per_s || 0);
   $('hPassos').textContent = Math.round(j.steps_per_s || 0);
   $('pViewers').innerHTML = 'watching <b>' + (j.viewers || 0) + '</b>';
   $('focoInfo').textContent = 'full cloud: ' + (j.foco % 2 ? 'male ' : 'female ') + (Math.floor(j.foco / 2) + 1);
+}
+
+// Painel do casal: mesma nuvem de disparos, so que grande e identificada. Fica em cima da cena
+// porque e a unica forma de ligar "este cerebro" a "esta mosca" - na grade de baixo, com 32
+// quadradinhos, ninguem sabe de quem e qual.
+const grandes = {};
+function desenharFoco(j, buf, len, rot) {
+  const par = Orgia.parNaCamera();
+  const iF = par * 2, iM = par * 2 + 1;
+  if (!grandes.F) {
+    grandes.F = { cv: $('cvF'), ctx: $('cvF').getContext('2d'), taxa: $('tF') };
+    grandes.M = { cv: $('cvM'), ctx: $('cvM').getContext('2d'), taxa: $('tM') };
+    $('painelFoco').hidden = false;
+  }
+  let off = 4 + len;
+  const bytes = j.bytes || [];
+  for (let i = 0; i < bytes.length; i++) {
+    const n = bytes[i];
+    if (i === iF || i === iM) {
+      const idx = decodeDV(new Uint8Array(buf, off, n));
+      const info = (j.moscas || [])[i] || {};
+      desenharCerebro(i === iF ? grandes.F : grandes.M, idx, rot, true, info.spikes_per_s || 0);
+    }
+    off += n;
+  }
+  $('focoInfo').textContent = 'pair ' + (par + 1) + ' · full cloud on the loudest brain';
 }
 
 function texto(m) {
@@ -348,6 +393,20 @@ const fmt = n => Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 
 const dinheiro = n => n >= 1e6 ? '$' + (n / 1e6).toFixed(2) + 'M' : (n >= 1e3 ? '$' + (n / 1e3).toFixed(1) + 'K' : '$' + Number(n).toFixed(0));
 const hora = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const esc = s => String(s == null ? '' : s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+
+// brilho da sala: cada visitante escolhe o dele e o navegador lembra
+(function () {
+  const el = $('brilho');
+  let v = 1;
+  try { v = parseFloat(localStorage.getItem('flyorgy.brilho')) || 1; } catch (e) { }
+  el.value = v;
+  const aplicar = () => {
+    Orgia.brilho(parseFloat(el.value));
+    try { localStorage.setItem('flyorgy.brilho', el.value); } catch (e) { }
+  };
+  el.addEventListener('input', aplicar);
+  setTimeout(aplicar, 1200);        // depois que a cena existe
+})();
 
 ligar();   // o 'ola' diz quantas moscas sao e so entao monta a sala e os cerebrinhos
 </script>
