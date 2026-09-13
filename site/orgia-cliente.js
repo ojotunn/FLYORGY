@@ -263,17 +263,13 @@ window.Orgia = (function () {
   }
 
   // raiz dela: o lugar do par na sala x a raiz que veio do corpo (altura e inclinacao dela sao reais)
-  function raizDela(q, par, empurrao, arfada) {
+  function raizDela(q, par, empurrao) {
     const a = S.raiz;
     RE.set(0, 0, par.yaw); RQ.setFromEuler(RE);
     SLOT.compose(V.set(par.x, par.y, par.z || 0), RQ, UM);
     HER.compose(V.set(0, 0, q[a + 2]), Q.set(q[a + 4], q[a + 5], q[a + 6], q[a + 3]).normalize(), UM);
     HER.premultiply(SLOT);
-    // o tranco: ela e empurrada para a frente e o nariz dela cai um pouco a cada estocada
-    if (empurrao || arfada) {
-      RO.compose(V.set(empurrao || 0, 0, 0), RQ.setFromEuler(RE.set(0, arfada || 0, 0, 'ZYX')), UM);
-      HER.multiply(RO);
-    }
+    if (empurrao) { TL.makeTranslation(empurrao, 0, 0); HER.multiply(TL); }   // ela e empurrada para a frente
     return HER;
   }
 
@@ -353,35 +349,12 @@ window.Orgia = (function () {
       // ---- ela ----
       const qEla = S.qEla;
       qEla.set(q);
-      const fE = est === 'mating' ? ondaEstocada(tt, ritmo) : 0;   // a mesma onda dele, um quadro atras
-      if (est === 'mating') {
-        // asas quase fechadas (senao ele atravessa), mas tremendo no ritmo
-        if (S.asas.joint_LWing_abre != null) {
-          const ab = 0.05 + 0.05 * Math.max(0, fE);
-          qEla[S.asas.joint_LWing_abre] += ab; qEla[S.asas.joint_RWing_abre] += ab;
-          qEla[S.asas.joint_LWing_bate] += 0.04 * Math.sin(tt * 2 * Math.PI * ritmo * 3);
-          qEla[S.asas.joint_RWing_bate] -= 0.04 * Math.sin(tt * 2 * Math.PI * ritmo * 3);
-        }
-        // cabeca dela balanca com o tranco e a tromba mexe
-        if (S.asas.joint_Head != null) qEla[S.asas.joint_Head] += 0.09 * fE + 0.03 * Math.sin(tt * 2 * Math.PI * ritmo * 0.5);
-        if (S.asas.joint_Proboscis != null) qEla[S.asas.joint_Proboscis] += 0.18 * Math.max(0, Math.sin(tt * 2 * Math.PI * ritmo * 0.33));
-        // pernas escorando o peso dele: as da frente firmam, as do meio e de tras abrem
-        for (const perna of ['LF', 'RF']) {
-          const fe = S.asas['joint_' + perna + 'Femur'], ti = S.asas['joint_' + perna + 'Tibia'];
-          if (fe != null) qEla[fe] -= 0.18 + 0.10 * fE;
-          if (ti != null) qEla[ti] += 0.26 + 0.12 * fE;
-        }
-        for (const perna of ['LM', 'RM', 'LH', 'RH']) {
-          const cx = S.asas['joint_' + perna + 'Coxa'], fe = S.asas['joint_' + perna + 'Femur'];
-          if (cx != null) qEla[cx] += (perna[0] === 'L' ? 0.12 : -0.12) * (1 + 0.5 * fE);
-          if (fe != null) qEla[fe] -= 0.10 * fE;
-        }
+      if (est === 'mating' && S.asas.joint_LWing_abre != null) {
+        const ab = 0.04 + 0.03 * Math.sin(tt * 2 * Math.PI * ritmo);   // asas quase fechadas: ele nao atravessa
+        qEla[S.asas.joint_LWing_abre] += ab; qEla[S.asas.joint_RWing_abre] += ab;
       }
-      // o tranco no corpo dela: empurrao para a frente e nariz para baixo, um quadro depois do dele
-      const raizF = raizDela(qEla, par, est === 'mating' ? par.empurrao : 0, est === 'mating' ? -0.055 * fE : 0);
+      const raizF = raizDela(qEla, par, est === 'mating' ? par.empurrao : 0);
       calcular(qEla, raizF, S.matriz);
-      // o abdomen DELA sobe ao encontro do dele (a femea levanta a ponta; e o que deixa o encaixe crivel)
-      if (est === 'mating') balancarRabo(-(0.10 + 0.16 * fE + 0.10 * lib), raizF, S.matriz);
       escrever(S.matriz, p * 2, S.reflexo);
 
       // ---- ele ----
@@ -390,7 +363,7 @@ window.Orgia = (function () {
         const amp = 0.10 * (0.4 + 0.6 * lib);
         px += amp * f; pz += 0.03 * f; pitch += -0.06 * f;      // O CORPO DELE AVANCA: era isto que faltava
         roll = 0.03 * Math.sin(tt * 2 * Math.PI * ritmo * 0.5);
-        par.empurrao = (0.055 + 0.115 * lib) * f;                // ela sente no quadro seguinte
+        par.empurrao = amp * f * 0.5;                            // ela sente no quadro seguinte
         par.rabo = S.aj.raboBase + (S.aj.raboAmp + 0.2 * lib) * f;
         calibrarEncaixe(q, par, lib, raizF);
         px += par.cal[0] * u; py += par.cal[1] * u; pz += par.cal[2] * u;
