@@ -7,8 +7,8 @@ processes, this runs **sixteen** in one, as a batch.
 
 ## The trick
 
-A connectome is expensive because of the synapse matrix: 15,091,983 synapses. That matrix is *the same
-matrix* for every fly. So the swarm shares one copy of it and each fly is a row of the state tensor.
+A connectome is expensive because of the connection matrix: 15,091,983 neuron-to-neuron edges,
+carrying 54,492,922 synapses between them. That matrix is *the same matrix* for every fly. So the swarm shares one copy of it and each fly is a row of the state tensor.
 
 Measured on an RX 7900 XT, 12/09/2026 (`brain/enxame.py` header):
 
