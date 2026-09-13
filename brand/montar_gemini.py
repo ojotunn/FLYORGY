@@ -46,9 +46,20 @@ salvar_quadrado(tk.resize((1024, 1024), Image.LANCZOS), 'ticker-aberto')
 c = tk.crop((int(L * 0.10), int(L * 0.14), int(L * 0.86), int(L * 0.90))).resize((1024, 1024), Image.LANCZOS)
 salvar_quadrado(c, 'ticker-fechado')
 
-# ---------------- avatar do X ----------------
-c.save(os.path.join(BRAND, 'x-avatar-1024.png'))
-print('  x-avatar-1024')
+# ---------------- a orgia: varios casais, para o perfil e para o ticker ----------------
+# Duas tomadas. O 'monte' e mais saturado e continua sendo um bloco vermelho reconhecivel a 32 px;
+# o 'lado a lado' mostra mais bicho mas lava no tamanho minimo.
+for arq, nome in (('orgia-monte.png', 'ticker-orgia-monte'), ('orgia-lado-a-lado.png', 'ticker-orgia-lado')):
+    caminho = os.path.join(GEM, arq)
+    if not os.path.exists(caminho):
+        continue
+    im = Image.open(caminho).convert('RGB')
+    salvar_quadrado(im.resize((1024, 1024), Image.LANCZOS), nome)
+
+# ---------------- avatar do X: a orgia (e o perfil, tem que ter mais de um casal) ----------------
+perfil = os.path.join(GEM, 'orgia-monte.png')
+Image.open(perfil).convert('RGB').resize((1024, 1024), Image.LANCZOS).save(os.path.join(BRAND, 'x-avatar-1024.png'))
+print('  x-avatar-1024 (a orgia)')
 
 # ---------------- capa do X ----------------
 cp = Image.open(os.path.join(GEM, 'capa.png')).convert('RGB')
@@ -69,6 +80,8 @@ capa.resize((1500, 500), Image.LANCZOS).save(os.path.join(BRAND, 'x-capa-1500x50
 print('  x-capa 3000x1000 + 1500x500')
 
 # ---------------- site: logo, favicon e imagem de compartilhamento ----------------
+# O logo do cabecalho aparece a 28 px e o favicon a 16: ali fica o CASAL, que ainda se
+# reconhece. A orgia com varios casais e para o perfil do X e para o ticker, que sao maiores.
 c.resize((256, 256), Image.LANCZOS).save(os.path.join(SITE, 'logo.png'))
 c.resize((64, 64), Image.LANCZOS).save(os.path.join(SITE, 'favicon.png'))
 # 1200x630 e mais alto que a capa: corta na LARGURA (a fonte tem altura de sobra), senao
