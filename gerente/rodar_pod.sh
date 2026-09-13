@@ -20,7 +20,8 @@ export FLY_CORPO_PISO=preto FLY_CORPO_CORES=real FLY_CORPO_SAIDA=pose
 export FLY_CEREBRO_AFINIDADE=0 FLY_CORPO_AFINIDADE=0
 export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl
 export FLY_MERCADO_MODO="${FLY_MERCADO_MODO:-papel}"
-export FLY_MERCADO_ORDENS="${FLY_MERCADO_ORDENS:-off}"   # o FLY ORGY nao opera: o mercado so vira estimulo
+export FLY_MERCADO_ORDENS="${FLY_MERCADO_ORDENS:-off}"       # o FLY ORGY nao opera: o mercado so vira estimulo
+export FLY_MERCADO_EMPRESTADA="${FLY_MERCADO_EMPRESTADA:-off}"  # ate o nosso token existir, o site nao mostra trade de outro
 export PYTHONUNBUFFERED=1
 # relay publico no Railway: o endereco fica em relay.dominio (no git) e o token em relay.token (FORA do
 # git; o mesmo valor esta na variavel FLY_RELAY_TOKEN do servico la). Sem o token o relay recusa a fonte.

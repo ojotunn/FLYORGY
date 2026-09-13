@@ -102,6 +102,13 @@ def sentidos_config():
     return v.lower()
 
 
+# Curva emprestada: antes do nosso token existir, o mercado adotava a curva mais movimentada da Pons
+# e os cards do site mostravam trades de OUTRO token. Bom para nao ficar mudo, ruim na vespera do
+# lancamento: quem entra em flyorgy.com ve compra e venda que nao sao nossas. Com 'off' o pool
+# continua sendo escolhido (e dele que sai a cotacao do ETH, que o resto precisa), mas os trades
+# dele NAO viram card nem estimulo. Quando sentidos.txt recebe o CA, tudo volta a andar.
+EMPRESTADA = os.environ.get('FLY_MERCADO_EMPRESTADA', 'on').strip().lower() not in ('off', '0', 'nao', 'false')
+
 ORDENS_ARQ = Path(__file__).resolve().parent / 'ordens.txt'     # 'on' | 'off': liga/desliga as ordens sem reiniciar
 ULTIMO_ARQ = Path(__file__).resolve().parent / 'ultimo_token.txt'   # token que ela opera (para retomar apos reinicio)
 AJUSTES_ARQ = Path(__file__).resolve().parent / 'ajustes.txt'       # max_ordem_usd=10  lote=0.10  (relido ao vivo)
@@ -809,7 +816,10 @@ def main():
                 except Exception:
                     pass
                 print(f'[mercado] token escolhido: {pool["nome"]} ({pool["par"]}) pool {pool["pool"]} token {pool.get("token")}', flush=True)
-                publicar({'classe': 'info', 'texto': f'no token of our own yet, so the room is riding {pool["nome"]} on Pons, the busiest curve right now'})
+                if EMPRESTADA:
+                    publicar({'classe': 'info', 'texto': f'no token of our own yet, so the room is riding {pool["nome"]} on Pons, the busiest curve right now'})
+                else:
+                    publicar({'classe': 'info', 'texto': 'no token yet. the room is running on its own until launch'})
         if pool is not None and agora - ultima_leitura >= INTERVALO and proibido(pool):
             # o token que ela olha entrou na lista de vetados (o dela acabou de ser lancado): larga na hora
             print(f'[mercado] {pool["nome"]} entrou na lista de vetados; ela larga e escolhe outro', flush=True)
@@ -863,7 +873,8 @@ def main():
                     historico.extend(trades)           # primeira leitura: guarda para o replay, sem estimular
                     enderecos.update(t['de'] for t in trades)
                     novos = []
-                processar(novos, trades)
+                if EMPRESTADA or sent is not None:
+                    processar(novos, trades)
                 tendencia(precos)
             else:
                 tendencia_posicao(precos)              # o token que ela segura tambem e sentido (queda = re/sombra)
