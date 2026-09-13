@@ -870,7 +870,8 @@ def main():
                 if len(vistos) > 5000:
                     vistos = set(t['tx'] for t in trades)
                 if not historico and trades:
-                    historico.extend(trades)           # primeira leitura: guarda para o replay, sem estimular
+                    if EMPRESTADA:
+                        historico.extend(trades)   # primeira leitura: guarda para o replay, sem estimular
                     enderecos.update(t['de'] for t in trades)
                     novos = []
                 if EMPRESTADA or sent is not None:
@@ -944,7 +945,8 @@ def main():
                 print(f'[mercado] {tipo}: {dado}', flush=True)
             carteira.eventos.clear()
         # ----- mercado quieto: replay de trades antigos, marcado como replay -----
-        if REPLAY and historico and agora - ultimo_trade_real > 90 and agora >= prox_replay:
+        if (REPLAY and (EMPRESTADA or sent is not None) and historico
+                and agora - ultimo_trade_real > 90 and agora >= prox_replay):
             prox_replay = agora + 8.0
             if not replay_fila:
                 replay_fila.extend(list(historico))      # historico inteiro, na ordem em que aconteceu

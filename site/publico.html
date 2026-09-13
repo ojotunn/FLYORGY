@@ -141,6 +141,9 @@ a{color:var(--ouro2)}
 .linha .val{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:13px}
 .linha.buy .val{color:#5fd08a}.linha.sell .val{color:#ff6a5c}.linha.sexo .val{color:var(--rosa)}
 .linha .quem{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6d5f63}
+/* card de trade repetido: tem que dizer que e repeticao, senao parece negocio novo */
+.linha .rep{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#8a7a52;
+  border:1px solid rgba(216,166,87,.35);border-radius:2px;padding:1px 5px}
 .linha .hora{margin-left:auto;font-size:10px;color:#6d5f63;font-family:'IBM Plex Mono',monospace}
 .linha .diz{margin-top:3px;color:#e2d2cf;font-size:13.5px;line-height:1.45}
 .linha.sexo .diz{color:#f0cfe0;font-style:italic}
@@ -387,6 +390,7 @@ function linha(m) {
     d.className = 'linha ' + (m.kind === 'buy' ? 'buy' : 'sell');
     d.innerHTML = '<div class="top"><span class="val">' + (m.kind === 'buy' ? '+' : '−') + '$'
       + Number(m.usd).toLocaleString(undefined, { maximumFractionDigits: 2 }) + '</span>'
+      + (m.replay ? '<span class="rep">replay</span>' : '')
       + '<span class="quem">' + esc(m.de || '') + '</span><span class="hora">' + hora() + '</span></div>'
       + '<div class="diz">' + esc(m.extra || m.estimulo || '') + '</div>';
   }
