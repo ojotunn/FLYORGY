@@ -2,6 +2,10 @@
 
 Tudo em en-US. O que muda entre as versões é só o tamanho do campo.
 
+**Sobre a Robinhood:** escrevo sempre **"Robinhood Chain"**, que é o nome da rede onde a Pons roda
+e onde o token vive. É fato e é a piada. Escrever só "Robinhood" solto soaria como se a corretora
+tivesse alguma coisa a ver com isto, o que não é verdade e é o tipo de frase que dá dor de cabeça.
+
 ---
 
 ## Nome e ticker
@@ -14,41 +18,46 @@ Tudo em en-US. O que muda entre as versões é só o tamanho do campo.
 
 ---
 
-## Descrição do launchpad (curta, ~300 caracteres)
+## Descrição do launchpad (~380 caracteres)
 
-> Thirty-two flies. Thirty-two whole brains — 138,639 neurons each, wired exactly like a real
-> fruit fly's, running live on a GPU. Every buy gets injected straight into their touch neurons
-> and the room fucks harder. Every big sell and she throws him off mid-thrust. Nothing here is
-> animated. flyorgy.com
+> The biggest fly orgy on Robinhood Chain. Thirty-two flies, thirty-two whole brains — 138,639
+> neurons each, wired exactly like a real fruit fly's, running live on a GPU. Every buy gets
+> injected straight into their touch neurons and the room fucks harder. Every big sell and she
+> throws him off mid-thrust. Nothing here is animated. flyorgy.com
 
-## Descrição do launchpad (versão sem palavrão, se o campo for moderado)
+## Mesma coisa sem palavrão, se o campo for moderado
 
-> Thirty-two flies. Thirty-two whole brains — 138,639 neurons each, wired exactly like a real
-> fruit fly's, running live on a GPU. Every buy is injected straight into their touch neurons and
-> the room goes harder. Every big sell and she throws him off mid-thrust. Nothing here is
-> animated. flyorgy.com
+> The biggest fly orgy on Robinhood Chain. Thirty-two flies, thirty-two whole brains — 138,639
+> neurons each, wired exactly like a real fruit fly's, running live on a GPU. Every buy is
+> injected straight into their touch neurons and the room goes harder. Every big sell and she
+> throws him off mid-thrust. Nothing here is animated. flyorgy.com
+
+## Versão curtíssima, se o campo for apertado
+
+> The biggest fly orgy on Robinhood Chain. 32 whole fly brains, live on a GPU. Your buys are what
+> they feel. Nothing here is animated. flyorgy.com
 
 ---
 
-## Bio do X (160 caracteres)
+## Bio do X
 
-> 32 real fly brains fucking in a back room. Your buys are their nervous system. Nothing here is
-> animated. flyorgy.com
+> The biggest fly orgy on Robinhood Chain. 32 real fly brains, and your buys are their nervous
+> system. flyorgy.com
 
 Alternativa mais seca:
 
-> 32 whole fly connectomes. One back room. Your buys are their nervous system. flyorgy.com
+> 32 whole fly connectomes fucking on Robinhood Chain. Your buys are what they feel. flyorgy.com
 
 ---
 
 ## Post fixado no X
 
-> We put thirty-two whole fruit-fly brains in a back room and wired your buys into their nervous
-> system.
+> The biggest fly orgy on Robinhood Chain is live.
 >
-> Not thirty-two animations. Thirty-two connectomes — 138,639 neurons and 15,091,983 synapses
-> each, in the same order they sit inside a real fly's head, firing a tenth of a millisecond at a
-> time on a GPU.
+> We put thirty-two whole fruit-fly brains in a back room and wired your buys into their nervous
+> system. Not thirty-two animations — thirty-two connectomes, 138,639 neurons and 15,091,983
+> synapses each, in the same order they sit inside a real fly's head, firing a tenth of a
+> millisecond at a time on a GPU.
 >
 > Nobody scripts the fucking. When you buy, we don't play a clip: we shove your buy into their
 > sensory neurons, the same cells that fire when a real fly gets touched or tastes sugar. Their
@@ -64,4 +73,4 @@ Alternativa mais seca:
 
 ## Uma linha, para responder no chat
 
-> Thirty-two real fly brains. Your buys are what they feel. flyorgy.com
+> Biggest fly orgy on Robinhood Chain. 32 real brains, your buys are what they feel. flyorgy.com
