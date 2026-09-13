@@ -882,14 +882,14 @@ def main():
                     enderecos.update(t['de'] for t in sent.historico)
                     print(f'[mercado] sentidos: {sent.nome} direto da chain (curva {sent.curva}); '
                           f'{len(sent.historico)} trades recentes carregados para o replay', flush=True)
-                    publicar({'classe': 'info', 'texto': f'she now feels every trade of {sent.nome}, straight from the chain'})
+                    publicar({'classe': 'info', 'texto': f'the house token is live: every trade of {sent.nome} now lands on all 32 of them, straight from the chain'})
                 except Exception as e:
                     prox_sent_tentativa = agora + 30
                     print(f'[mercado] feed da chain falhou para {cfg}: {str(e)[:80]}; tento em 30 s', flush=True)
             else:
                 sent, sent_cfg = None, ''
                 historico.clear(); enderecos.clear(); replay_fila.clear()
-                publicar({'classe': 'info', 'texto': f'she feels the trades of {pool["nome"]} again'})
+                publicar({'classe': 'info', 'texto': f'back to riding {pool["nome"]}, the busiest curve on Robinhood Chain'})
         if sent is not None and agora - ultima_sent >= SENTIDOS_INTERVALO:
             ultima_sent = agora
             novos = sent.ler(eth_usd)
